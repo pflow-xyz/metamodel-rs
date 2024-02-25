@@ -8,7 +8,7 @@ pub struct Oid {
 impl Oid {
     pub fn new(bytes: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
         let hash = MultihashDigest::digest(&Code::Sha2_256, bytes);
-        let cid = Cid::new_v1(0x12, hash);
+        let cid = Cid::new_v1(0x55, hash); // NOTE: always produces string starting with "zb2"
         Ok(Self { cid })
     }
 
@@ -38,6 +38,6 @@ mod tests {
         let oid = Oid::new(DINING_PHILOSOPHERS.as_bytes()).expect("Failed to create Oid");
         let oid_string = oid.to_string();
         println!("oid_string: {:?}", oid_string);
-        assert_eq!(oid_string, "zUM7WNh744LkY5KqFcLXjP33St1HX5ajsu8KyqV6KfNiR87pU");
+        assert_eq!(oid_string, "zb2rhhAP4oqMEYFwLJ1UKgQrvBWsDkrvkY9Sn4HBVgfZ5ymNY");
     }
 }

@@ -83,14 +83,15 @@ impl StateMachine {
             let inhibit = arc.inhibit.unwrap_or(false);
             let read = arc.read.unwrap_or(false);
             if inhibit {
-                transitions.get_mut(&source).unwrap().guards.insert(target.clone(), Guard {
-                    delta: vec![0; vector_size],
-                    read: read,
-                });
+                // FIXME
+                // transitions.get_mut(&source).unwrap().guards.insert(target.clone(), Guard {
+                //     delta: vec![0; vector_size],
+                //     read: read,
+                // });
             } else {
                 assert_ne!(produce, consume, "must be either produce or consume");
                 if consume {
-                    transitions.get_mut(&source).unwrap().delta[model.places.get(&target).unwrap().offset as usize] = 0 - weight;
+                    transitions.get_mut(&target).unwrap().delta[model.places.get(&source).unwrap().offset as usize] = 0 - weight;
                 } else {
                     transitions.get_mut(&source).unwrap().delta[model.places.get(&target).unwrap().offset as usize] = weight;
                 }
@@ -137,7 +138,7 @@ impl Transaction {
 pub trait Vasm {
     fn empty_vector(&self) -> Vector;
     fn initial_vector(&self) -> Vector;
-    fn transform(&self, state: Vector, action: &str, multiple: i32) -> Transaction;
+    fn transform(&self, state: &Vector, action: &str, multiple: i32) -> Transaction;
 }
 
 pub fn declare(declaration: fn(&mut dyn FlowDsl)) -> Box<dyn Vasm> {
@@ -154,7 +155,7 @@ impl Vasm for StateMachine {
     }
 
     // REVIEW: test that this works properly
-    fn transform(&self, state: Vector, action: &str, multiple: i32) -> Transaction {
+    fn transform(&self, state: &Vector, action: &str, multiple: i32) -> Transaction {
         let transition = self.transitions.get(action).unwrap_or_else(|| panic!("no transition for {}", action));
         let mut output = state.clone();
         for (i, v) in transition.delta.iter().enumerate() {

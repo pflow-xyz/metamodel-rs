@@ -131,8 +131,16 @@ impl PetriNet {
         return;
     }
 
-    pub fn add_arc(&mut self, source: String, target: String, weight: Option<i32>, consume: Option<bool>, produce: Option<bool>, inhibit: Option<bool>, read: Option<bool>) {
-        self.arcs.push(Arrow { source, target, weight, consume, produce, inhibit, read });
+    pub fn add_arc(&mut self, source: &str, target: &str, weight: Option<i32>, consume: Option<bool>, produce: Option<bool>, inhibit: Option<bool>, read: Option<bool>) {
+        self.arcs.push(Arrow {
+            source: source.to_string(),
+            target: target.to_string(),
+            weight,
+            consume,
+            produce,
+            inhibit,
+            read
+        });
         return;
     }
 }

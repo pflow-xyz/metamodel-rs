@@ -41,11 +41,13 @@ impl<'a> FlowDsl for Builder<'a> {
     }
 
     fn arrow(&mut self, source: &str, target: &str, weight: i32) {
-        //TxNode::new(&self.net, label.to_string(), role.to_string(), pos)
+        assert!(weight > 0, "weight must be positive");
+        self.net.add_arc(source, target, Some(weight), None, None, None, None);
     }
 
     fn guard(&mut self, source: &str, target: &str, weight: i32) {
-        //TxNode::new(&self.net, label.to_string(), role.to_string(), pos)
+        assert!(weight > 0, "weight must be positive");
+        self.net.add_arc( source, target, None, None, None, Some(true), None);
     }
 }
 
@@ -74,11 +76,11 @@ mod tests {
         let model = declare(model_test_code);
         let vm = model.deref();
         let state = vm.initial_vector();
-        let res = vm.transform(state, "bar", 1);
+        let res = vm.transform(&state, "bar", 1);
 
         assert!(res.is_ok());
         // FIXME actually make state changes
-        //assert_ne!(res.output, state);
+        assert_ne!(res.output, state);
         println!("{:?}", res);
     }
 }
