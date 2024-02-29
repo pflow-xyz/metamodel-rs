@@ -1,18 +1,27 @@
 use serde::Serialize;
 
-use crate::oid::Oid;
 use crate::compression::{encode_zip, unzip_encoded};
+use crate::oid::Oid;
 use crate::petri_net::PetriNet;
 
+/// `Zblob` is a struct used to pack and unpack a zipped base64 encoded PetriNet into a sharable blob.
 #[derive(Debug, Clone, Serialize)]
 pub struct Zblob {
+    /// The id of the zblob.
     pub id: i64,
+    /// The IPFS CID of the zblob.
     pub ipfs_cid: String,
+    /// The base64 zipped content of the zblob.
     pub base64_zipped: String,
+    /// The title of the zblob.
     pub title: String,
+    /// The description of the zblob.
     pub description: String,
+    /// The keywords associated with the zblob.
     pub keywords: String,
+    /// The referrer of the zblob.
     pub referrer: String,
+    /// The creation time of the zblob.
     pub created_at: String,
 }
 
@@ -39,11 +48,13 @@ impl Zblob {
         if encoded_zip.is_some() {
             zblob.base64_zipped = encoded_zip.unwrap().to_string();
             zblob.ipfs_cid = Oid::new(encoded_zip.unwrap().as_bytes()).unwrap().to_string();
+            zblob.keywords = "".to_string();
         }
         zblob
     }
     pub fn from_net(net: &PetriNet) -> Self {
-        let data = encode_zip(&serde_json::to_string(net).unwrap(), "model.json");
+        let net_json = net.to_json().unwrap();
+        let data = encode_zip(&net_json, "model.json");
         return Self::from_string(Some(&data));
     }
 

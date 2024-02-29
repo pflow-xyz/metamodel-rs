@@ -1,25 +1,13 @@
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::Read;
-
 use serde::{Deserialize, Serialize};
 use serde_json::Error;
+use cjson;
 
-use crate::dsl::{FlowDsl, Builder};
+use crate::dsl::{Builder, FlowDsl};
+use crate::zblob::Zblob;
 
-pub fn read_petri_net_from_string(contents: String) -> Result<PetriNet, Error> {
-    let mut petri_net: PetriNet = serde_json::from_str(&*contents)?;
-    petri_net.populate_arc_attributes();
-    Ok(petri_net)
-}
 
-pub fn read_petri_net_from_file(file_path: &str) -> Result<PetriNet, Error> {
-    let mut file = File::open(file_path).expect("Unable to open file");
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).expect("Unable to read file");
-    read_petri_net_from_string(contents)
-}
-
+/// PetriNet stores petri-net elements used during the construction of a petri-net.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct PetriNet {
@@ -52,8 +40,27 @@ impl PetriNet {
         func(&mut flow_builder);
         return flow_builder;
     }
+
+    /// Creates a new `PetriNet` object from the given JSON string.
+    pub fn from_json(contents: String) -> Result<Self, Error> {
+        let mut petri_net: PetriNet = serde_json::from_str(&*contents)?;
+        petri_net.populate_arc_attributes();
+        Ok(petri_net)
+    }
+
+    /// Converts the `PetriNet` to a canonical JSON string.
+    pub fn to_json(&self) -> Result<String, cjson::Error> {
+        let res: serde_json::Value = serde_json::to_value(self)?;
+        cjson::to_string(&res)
+    }
+
+    /// Converts the `PetriNet` to a `Zblob` object.
+    pub fn to_zblob(&self) -> Zblob {
+        Zblob::from_net(self)
+    }
 }
 
+/// Place is a struct that represents a place (cell in FLowDsl).
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Place {
     pub offset: i32,
@@ -75,6 +82,7 @@ impl Default for Place {
     }
 }
 
+/// Transition is a struct that represents a transition (func in FlowDsl).
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Transition {
     pub role: Option<String>,
@@ -92,6 +100,7 @@ impl Default for Transition {
     }
 }
 
+/// Arrow is a struct that represents an arrow (arc in FlowDsl).
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Arrow {
     pub source: String,
@@ -104,6 +113,7 @@ pub struct Arrow {
 }
 
 impl PetriNet {
+    /// Populates the arc attributes of the petri-net by inferring the values of consume, produce, inhibit, and read.
     pub fn populate_arc_attributes(&mut self) {
         for arc in &mut self.arcs {
             if arc.consume.is_none() {
@@ -121,16 +131,19 @@ impl PetriNet {
         }
     }
 
+    /// Adds a place to the petri-net.
     pub fn add_place(&mut self, label: &str, offset: i32, initial: Option<i32>, capacity: Option<i32>, x: i32, y: i32) {
         self.places.insert(label.to_string(), Place { offset, initial, capacity, x, y });
         return;
     }
 
+    /// Adds a transition to the petri-net.
     pub fn add_transition(&mut self, label: &str, role: &str, x: i32, y: i32) {
         self.transitions.insert(label.to_string(), Transition { role: Option::from(role.to_string()), x, y });
         return;
     }
 
+    /// Adds an arc to the petri-net.
     pub fn add_arc(&mut self, source: &str, target: &str, weight: Option<i32>, consume: Option<bool>, produce: Option<bool>, inhibit: Option<bool>, read: Option<bool>) {
         self.arcs.push(Arrow {
             source: source.to_string(),
@@ -139,7 +152,7 @@ impl PetriNet {
             consume,
             produce,
             inhibit,
-            read
+            read,
         });
         return;
     }
@@ -153,9 +166,29 @@ mod tests {
 
     #[test]
     fn test_importing_json() {
-        let petri_net = read_petri_net_from_string(DINING_PHILOSOPHERS.to_string()).unwrap();
+        let petri_net = PetriNet::from_json(DINING_PHILOSOPHERS.to_string()).unwrap();
         assert_eq!(petri_net.places.len(), 15);
         assert_eq!(petri_net.transitions.len(), 10);
         assert_eq!(petri_net.arcs.len(), 40);
+    }
+
+    #[test]
+    fn test_exporting_json() {
+        let petri_net = PetriNet::from_json(DINING_PHILOSOPHERS.to_string()).unwrap();
+        let json = petri_net.to_json().unwrap();
+        let net = PetriNet::from_json(json).unwrap();
+        assert_eq!(net.places.len(), 15);
+    }
+
+    #[test]
+    fn test_zblob() {
+        let petri_net = PetriNet::from_json(DINING_PHILOSOPHERS.to_string()).unwrap();
+        let zblob = petri_net.to_zblob();
+        let net = zblob.to_net();
+        assert_eq!(net.places.len(), 15);
+        // test that it starts with zb2
+        assert_eq!(zblob.ipfs_cid.chars().nth(0).unwrap(), 'z');
+        assert_eq!(zblob.ipfs_cid.chars().nth(1).unwrap(), 'b');
+        assert_eq!(zblob.ipfs_cid.chars().nth(2).unwrap(), '2');
     }
 }

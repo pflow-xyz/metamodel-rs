@@ -3,10 +3,26 @@ use std::io::Read;
 use std::io::Write;
 
 use base64::{Engine as _, engine::general_purpose};
-use zip::CompressionMethod;
+use zip::{CompressionMethod, DateTime};
 use zip::read::ZipArchive;
 use zip::write::FileOptions;
 
+/// Decodes the given base64 string into a zip file and then extracts the file with the given filename from the zip file.
+///
+/// # Arguments
+///
+/// * `encoded_data` - The base64 encoded string representing the zip file.
+/// * `filename` - The name of the file to be extracted from the zip file.
+///
+/// # Returns
+///
+/// * An `Option<String>` that contains the contents of the extracted file if the file was found, or `None` if the file was not found.
+///
+/// # Example
+///
+/// ```
+/// let decoded = unzip_encoded(encoded, "greeting.txt");
+/// ```
 pub fn unzip_encoded(encoded_data: &str, filename: &str) -> Option<String> {
     let decoded = general_purpose::STANDARD.decode(encoded_data);
     if !decoded.is_ok() {
@@ -27,6 +43,22 @@ pub fn unzip_encoded(encoded_data: &str, filename: &str) -> Option<String> {
     None
 }
 
+/// Decodes the base64 string from the given URL into a zip file and then extracts the file with the given filename from the zip file.
+///
+/// # Arguments
+///
+/// * `url` - The URL containing the base64 encoded string representing the zip file.
+/// * `filename` - The name of the file to be extracted from the zip file.
+///
+/// # Returns
+///
+/// * An `Option<String>` that contains the contents of the extracted file if the file was found, or `None` if the file was not found.
+///
+/// # Example
+///
+/// ```
+/// let decoded = unzip_encoded_url("https://example.com/p/?z=zb2+xxxxxxxxxxxxx", "coinbase.txt");
+/// ```
 pub fn unzip_encoded_url(url: &str, filename: &str) -> Option<String> {
     let query_string = url.split('?').collect::<Vec<&str>>()[1];
     let z = query_string.split('&').find(|&param| param.starts_with("z="))?;
@@ -35,12 +67,30 @@ pub fn unzip_encoded_url(url: &str, filename: &str) -> Option<String> {
     unzip_encoded(z, filename)
 }
 
+/// Encodes the given file data into a zip file and then encodes the zip file into a base64 string.
+///
+/// # Arguments
+///
+/// * `file_data` - The data to be written into the file.
+/// * `filename` - The name of the file to be created in the zip file.
+///
+/// # Returns
+///
+/// * A base64 encoded string representing the zip file.
+///
+/// # Example
+///
+/// ```
+/// let msg = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
+/// let encoded = encode_zip(msg, "coinbase.txt");
+/// ```
 pub fn encode_zip(file_data: &str, filename: &str) -> String {
     let writer = Cursor::new(vec![]);
     let mut zip = zip::ZipWriter::new(writer);
 
     let options = FileOptions::default()
         .compression_method(CompressionMethod::Stored)
+        .last_modified_time(DateTime::from_date_and_time(2009, 1, 3, 0, 0, 0).unwrap())
         .unix_permissions(0o755);
 
     zip.start_file(filename, options).unwrap();
@@ -53,7 +103,7 @@ pub fn encode_zip(file_data: &str, filename: &str) -> String {
 #[cfg(test)]
 mod tests {
     use crate::fixtures::{DINING_PHILOSOPHERS, INHIBIT_TEST};
-    use crate::petri_net::read_petri_net_from_string;
+    use crate::petri_net::PetriNet;
 
     use super::*;
 
@@ -68,7 +118,7 @@ mod tests {
     fn test_unzip_test_model() {
         let decoded = unzip_encoded_url(&format!("https://example.com/p/?z={}", INHIBIT_TEST), "model.json").unwrap();
 
-        match read_petri_net_from_string(decoded) {
+        match PetriNet::from_json(decoded) {
             Ok(net) => {
                 assert_eq!(net.arcs.len(), 4);
                 assert_eq!(net.places.len(), 1);
