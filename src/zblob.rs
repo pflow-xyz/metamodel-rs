@@ -42,24 +42,29 @@ impl Default for Zblob {
     }
 }
 
+/// The filename used to store the model in the zip file.
+pub const ZBLOB_NET: &str = "model.json";
+
 impl Zblob {
     pub fn from_string(encoded_zip: Option<&str>) -> Self {
         let mut zblob = Zblob::default();
         if encoded_zip.is_some() {
             zblob.base64_zipped = encoded_zip.unwrap().to_string();
-            zblob.ipfs_cid = Oid::new(encoded_zip.unwrap().as_bytes()).unwrap().to_string();
+            zblob.ipfs_cid = Oid::new(encoded_zip.unwrap().as_bytes())
+                .unwrap()
+                .to_string();
             zblob.keywords = "".to_string();
         }
         zblob
     }
     pub fn from_net(net: &PetriNet) -> Self {
         let net_json = net.to_json().unwrap();
-        let data = encode_zip(&net_json, "model.json");
+        let data = encode_zip(&net_json, ZBLOB_NET);
         return Self::from_string(Some(&data));
     }
 
     pub fn to_net(&self) -> PetriNet {
-        let decoded = unzip_encoded(&self.base64_zipped, "model.json").unwrap();
+        let decoded = unzip_encoded(&self.base64_zipped, ZBLOB_NET).unwrap();
         return serde_json::from_str(&decoded).unwrap();
     }
 }

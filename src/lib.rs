@@ -4,7 +4,6 @@
 //! - State machine data types are executed as a [Vector Addition State Machine (VASM)](https://en.wikipedia.org/wiki/Vector_addition_system).
 //! - Data models are viewable / shareable in browsers by using [https://pflow-dev.github.io/pflow-js/p/](https://pflow-dev.github.io/pflow-js/p/)
 
-
 /// The `petri_net` module contains the definition and implementation of the `PetriNet` struct.
 pub mod petri_net;
 

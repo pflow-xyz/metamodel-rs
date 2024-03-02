@@ -50,15 +50,14 @@ pub type TransitionMap = HashMap<String, Transition>;
 /// StateMachine is a struct that holds the vectorized / executable form of a Petri-net.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateMachine {
-    initial: Vector,
-    capacity: Vector,
-    places: Vec<String>,
-    transitions: TransitionMap,
-    roles: RoleMap,
+    pub initial: Vector,
+    pub capacity: Vector,
+    pub places: Vec<String>,
+    pub transitions: TransitionMap,
+    pub roles: RoleMap,
 }
 
 impl StateMachine {
-
     /// Creates a new `StateMachine` object from the given `PetriNet`.
     pub fn new(declaration: fn(&mut dyn FlowDsl)) -> Self {
         PetriNet::new().declare(declaration).as_vasm()
@@ -74,13 +73,22 @@ impl StateMachine {
 
         let vector_size = model.places.len();
 
-        let mut transitions: TransitionMap = model.transitions.iter().map(|(k, v)| (k.clone(), Transition {
-            label: k.clone(),
-            role: v.role.clone().unwrap_or("default".to_string()),
-            delta: vec![0; vector_size],
-            guards: GuardMap::new(),
-            allow_reentry: false,
-        })).collect();
+        let mut transitions: TransitionMap = model
+            .transitions
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    Transition {
+                        label: k.clone(),
+                        role: v.role.clone().unwrap_or("default".to_string()),
+                        delta: vec![0; vector_size],
+                        guards: GuardMap::new(),
+                        allow_reentry: false,
+                    },
+                )
+            })
+            .collect();
 
         model.arcs.iter().for_each(|arc| {
             let source = arc.source.clone();
@@ -92,22 +100,30 @@ impl StateMachine {
             let read = arc.read.unwrap_or(false);
             if inhibit {
                 if read {
-                    transitions.get_mut(&source).unwrap().guards.insert(target.clone(), Guard {
-                        delta: vec![0; vector_size],
-                        read: read,
-                    });
+                    transitions.get_mut(&source).unwrap().guards.insert(
+                        target.clone(),
+                        Guard {
+                            delta: vec![0; vector_size],
+                            read: read,
+                        },
+                    );
                 } else {
-                    transitions.get_mut(&target).unwrap().guards.insert(source.clone(), Guard {
-                        delta: vec![0; vector_size],
-                        read: read,
-                    });
+                    transitions.get_mut(&target).unwrap().guards.insert(
+                        source.clone(),
+                        Guard {
+                            delta: vec![0; vector_size],
+                            read: read,
+                        },
+                    );
                 }
             } else {
                 assert_ne!(produce, consume, "must be either produce or consume");
                 if consume {
-                    transitions.get_mut(&target).unwrap().delta[model.places.get(&source).unwrap().offset as usize] = 0 - weight;
+                    transitions.get_mut(&target).unwrap().delta
+                        [model.places.get(&source).unwrap().offset as usize] = 0 - weight;
                 } else {
-                    transitions.get_mut(&source).unwrap().delta[model.places.get(&target).unwrap().offset as usize] = weight;
+                    transitions.get_mut(&source).unwrap().delta
+                        [model.places.get(&target).unwrap().offset as usize] = weight;
                 }
             }
         });
@@ -158,15 +174,6 @@ impl Transaction {
     ///
     /// * A boolean indicating whether the transaction was successful.
     ///
-    /// # Example
-    ///
-    /// ```
-    /// if transaction.is_ok() {
-    ///     println!("The transaction was successful.");
-    /// } else {
-    ///     println!("The transaction failed.");
-    /// }
-    /// ```
     pub fn is_ok(&self) -> bool {
         self.ok
     }
@@ -226,7 +233,10 @@ impl Vasm for StateMachine {
 
     // REVIEW: test that this works properly
     fn transform(&self, state: &Vector, action: &str, multiple: i32) -> Transaction {
-        let transition = self.transitions.get(action).unwrap_or_else(|| panic!("no transition for {}", action));
+        let transition = self
+            .transitions
+            .get(action)
+            .unwrap_or_else(|| panic!("no transition for {}", action));
         let mut output = state.clone();
         let mut ok = true;
         let role = transition.role.clone();
@@ -246,21 +256,22 @@ impl Vasm for StateMachine {
         }
         for (_, v) in transition.guards.iter() {
             let guard = v;
-            let mut sum = 0;
+            let mut sum = Vector::new();
             for (i, w) in guard.delta.iter().enumerate() {
-                sum += w * state[i];
+                sum.push(output[i] + w * multiple);
             }
-            if guard.read {
-                if sum > 0 {
-                    ok = false;
-                    inhibited = Some(true);
-                }
-            } else {
-                if sum <= 0 {
-                    ok = false;
-                    inhibited = Some(false);
-                }
-            }
+            // FIXME likely this is wrong...
+            // if guard.read {
+            //     if sum > 0 {
+            //         ok = false;
+            //         inhibited = Some(true);
+            //     }
+            // } else {
+            //     if sum <= 0 {
+            //         ok = false;
+            //         inhibited = Some(false);
+            //     }
+            // }
         }
         for (_, v) in output.iter().enumerate() {
             if v.to_be() < 0 {

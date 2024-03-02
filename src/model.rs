@@ -1,11 +1,11 @@
 use crate::dsl::FlowDsl;
 use crate::petri_net::PetriNet;
-use crate::vasm::Vasm;
+use crate::vasm::StateMachine;
 
 pub struct Model {
-    pub vm: Box<dyn Vasm>,
     pub net: PetriNet,
-    pub declaration: fn(&mut dyn FlowDsl),
+    pub declaration: Vec<fn(&mut dyn FlowDsl)>,
+    pub vm: Box<StateMachine>,
 }
 
 impl Model {
@@ -13,10 +13,16 @@ impl Model {
         let mut net = PetriNet::new();
         let vm = Box::new(net.declare(func).as_vasm());
         Self {
-            vm,
             net,
-            declaration: func
+            declaration: Vec::from([func]),
+            vm,
         }
+    }
+
+    pub fn declare(&mut self, func: fn(&mut dyn FlowDsl)) -> &mut Model {
+        self.declaration.push(func);
+        self.vm = Box::new(self.net.declare(func).as_vasm());
+        self
     }
 }
 
@@ -26,13 +32,26 @@ mod tests {
 
     #[test]
     fn test_model() {
-        let model = Model::new(|p| {
+        let mut model = Model::new(|p| {
             p.model_type("petriNet");
-            p.cell("a", Option::from(1), None, 0, 0);
+            p.cell("b", Option::from(1), None, 0, 0);
             p.func("f", "default", 1, 1);
         });
+
+        model.declare(|p| {
+            p.cell("a", Option::from(1), None, 0, 0);
+            p.func("g", "default", 1, 1);
+            p.arrow("a", "f", 1);
+        });
+
         assert_eq!(model.net.model_type, "petriNet");
         let zblob = model.net.to_zblob();
-        assert_eq!(zblob.ipfs_cid, "zb2rhoPcxUWE6MeyZuz4sntoko8vVhLgZaXKmSnXgYis2Vy8c");
+        assert_eq!(
+            zblob.ipfs_cid,
+            "zb2rhkw6QcSejeXGWoyrkR8c9BP5VRyz5tuADYvJUVZ6ai5MP"
+        );
+
+        let r = model.vm.roles.get("default").unwrap();
+        assert!(r, "expected role");
     }
 }

@@ -35,7 +35,14 @@ pub trait FlowDsl {
     /// Sets the model type of the Petri net.
     fn model_type(&mut self, model_type: &str);
     /// Adds a cell (place) to the Petri net.
-    fn cell<'a>(&mut self, label: &'a str, initial: Option<i32>, capacity: Option<i32>, x: i32, y: i32) -> &'a str;
+    fn cell<'a>(
+        &mut self,
+        label: &'a str,
+        initial: Option<i32>,
+        capacity: Option<i32>,
+        x: i32,
+        y: i32,
+    ) -> &'a str;
     /// Adds a function (transition) to the Petri net.
     fn func<'a>(&mut self, label: &'a str, role: &str, x: i32, y: i32) -> &'a str;
     /// Adds an arrow (arc) from a source to a target in the Petri net.
@@ -52,21 +59,9 @@ pub trait FlowDsl {
 /// * `new` - Creates a new `Builder` object.
 /// * `as_vasm` - Converts the `PetriNet` object into a `StateMachine` object.
 ///
-/// # Example
-///
-/// ```
-/// let mut net = PetriNet::new();
-/// let mut builder = Builder::new(&mut net);
-/// builder.model_type("petriNet");
-/// let foo = builder.cell("foo", Option::from(1), None, 0, 0);
-/// let bar = builder.func("bar", "default", 0, 0);
-/// builder.arrow(foo, bar, 1);
-/// let model = builder.as_vasm();
-/// ```
 pub struct Builder<'a> {
     pub net: &'a mut PetriNet,
 }
-
 
 impl<'a> Builder<'a> {
     /// Creates a new `Builder` object with the given `PetriNet` object.
@@ -79,16 +74,8 @@ impl<'a> Builder<'a> {
     ///
     /// * A new `Builder` object.
     ///
-    /// # Example
-    ///
-    /// ```
-    /// let mut net = PetriNet::new();
-    /// let builder = Builder::new(&mut net);
-    /// ```
     pub fn new(net: &'a mut PetriNet) -> Self {
-        Self {
-            net
-        }
+        Self { net }
     }
 
     /// Converts the `PetriNet` object into a `StateMachine` object.
@@ -97,13 +84,6 @@ impl<'a> Builder<'a> {
     ///
     /// * A `StateMachine` object that represents the `PetriNet` object.
     ///
-    /// # Example
-    ///
-    /// ```
-    /// let mut net = PetriNet::new();
-    /// let mut builder = Builder::new(&mut net);
-    /// let model = builder.as_vasm();
-    /// ```
     pub fn as_vasm(&mut self) -> StateMachine {
         StateMachine::from_model(self.net)
     }
@@ -114,7 +94,14 @@ impl<'a> FlowDsl for Builder<'a> {
         self.net.model_type = model_type.to_string();
     }
 
-    fn cell<'b>(&mut self, label: &'b str, initial: Option<i32>, capacity: Option<i32>, x: i32, y: i32) -> &'b str {
+    fn cell<'b>(
+        &mut self,
+        label: &'b str,
+        initial: Option<i32>,
+        capacity: Option<i32>,
+        x: i32,
+        y: i32,
+    ) -> &'b str {
         let offset = self.net.places.len() as i32;
         self.net.add_place(label, offset, initial, capacity, x, y);
         return label;
@@ -127,33 +114,41 @@ impl<'a> FlowDsl for Builder<'a> {
 
     fn arrow(&mut self, source: &str, target: &str, weight: i32) {
         assert!(weight > 0, "weight must be positive");
-        self.net.add_arc(source, target, Some(weight), None, None, None, None);
+        self.net
+            .add_arc(source, target, Some(weight), None, None, None, None);
     }
 
     fn guard(&mut self, source: &str, target: &str, weight: i32) {
         assert!(weight > 0, "weight must be positive");
-        self.net.add_arc(source, target, None, None, None, Some(true), None);
+        self.net
+            .add_arc(source, target, None, None, None, Some(true), None);
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::model::Model;
     use crate::vasm::{Transaction, Vasm};
+
     use super::*;
 
-
     struct TestModel {
-        vm: Box<dyn Vasm>,
+        model: Model,
         state: Vec<i32>,
     }
 
     impl TestModel {
+
+        fn to_link(&self) -> String {
+            format!("{}{}", "https://pflow.dev/p/?z=", self.model.net.to_zblob().base64_zipped.replace(" ", "+"))
+        }
+
         fn new() -> Self {
-            let vm = Box::new(StateMachine::new(model_test_code));
-            let state = vm.initial_vector();
+            let model = Model::new(model_test_code);
+            let state = model.vm.initial_vector().clone();
             Self {
-                vm,
-                state
+                model,
+                state,
             }
         }
 
@@ -176,14 +171,14 @@ mod tests {
         }
 
         fn assert_fail(&self, action: &str) -> Transaction {
-            let res = self.vm.transform(&self.state, action, 1);
+            let res = self.model.vm.transform(&self.state, action, 1);
             println!("{:?}", res);
             assert!(res.is_err(), "expected fail");
             res
         }
 
         fn assert_pass(&mut self, action: &str) -> Transaction {
-            let res = self.vm.transform(&self.state, action, 1);
+            let res = self.model.vm.transform(&self.state, action, 1);
             println!("{:?}", res);
             assert!(res.is_ok(), "expected pass");
             self.state = res.output.clone();
@@ -195,11 +190,11 @@ mod tests {
         p.model_type("petriNet");
 
         let r = "default";
-        let foo = p.cell("foo", Option::from(1), Option::from(3), 0, 0);
-        let bar = p.func("bar", r, 0, 0);
-        let baz = p.func("baz", r, 0, 0);
-        let inc = p.func("inc", r, 0, 0);
-        let dec = p.func("dec", r, 0, 0);
+        let foo = p.cell("foo", Option::from(1), Option::from(3), 707, 364);
+        let bar = p.func("bar", r, 560, 480);
+        let baz = p.func("baz", r, 850, 480);
+        let inc = p.func("inc", r, 560, 240);
+        let dec = p.func("dec", r, 850, 240);
 
         p.arrow(inc, foo, 1);
         p.arrow(foo, dec, 1);
@@ -207,10 +202,10 @@ mod tests {
         p.guard(foo, baz, 1);
     }
 
-
     #[test]
     fn test_loading_dsl() {
-        let m= &mut TestModel::new();
+        let m = &mut TestModel::new();
+        println!("{}", m.to_link());
         m.assert_pass("bar");
         // FIXME inhibited flags not working
         // m.assert_inhibited("baz");
