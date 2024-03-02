@@ -2,10 +2,10 @@ use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
 
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
+use zip::{CompressionMethod, DateTime};
 use zip::read::ZipArchive;
 use zip::write::FileOptions;
-use zip::{CompressionMethod, DateTime};
 
 /// Decodes the given base64 string into a zip file and then extracts the file with the given filename from the zip file.
 ///
@@ -109,7 +109,7 @@ mod tests {
             &format!("https://example.com/p/?z={}", INHIBIT_TEST),
             ZBLOB_NET,
         )
-        .unwrap();
+            .unwrap();
 
         match PetriNet::from_json(decoded) {
             Ok(net) => {

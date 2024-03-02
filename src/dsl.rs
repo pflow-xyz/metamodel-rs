@@ -114,14 +114,12 @@ impl<'a> FlowDsl for Builder<'a> {
 
     fn arrow(&mut self, source: &str, target: &str, weight: i32) {
         assert!(weight > 0, "weight must be positive");
-        self.net
-            .add_arc(source, target, Some(weight), None, None, None, None);
+        self.net.add_arc(source, target, Some(weight), None, None, None, None);
     }
 
     fn guard(&mut self, source: &str, target: &str, weight: i32) {
         assert!(weight > 0, "weight must be positive");
-        self.net
-            .add_arc(source, target, None, None, None, Some(true), None);
+        self.net.add_arc(source, target, Some(weight), Some(true), None, Some(true), None);
     }
 }
 
@@ -138,7 +136,6 @@ mod tests {
     }
 
     impl TestModel {
-
         fn to_link(&self) -> String {
             format!("{}{}", "https://pflow.dev/p/?z=", self.model.net.to_zblob().base64_zipped.replace(" ", "+"))
         }
@@ -154,32 +151,30 @@ mod tests {
 
         fn assert_underflow(&self, action: &str) -> Transaction {
             let res = self.assert_fail(action);
-            assert!(res.underflow.unwrap(), "expected underflow");
+            assert!(res.underflow, "expected underflow");
             res
         }
 
         fn assert_overflow(&self, action: &str) -> Transaction {
             let res = self.assert_fail(action);
-            assert!(res.overflow.unwrap(), "expected overflow");
+            assert!(res.overflow, "expected overflow");
             res
         }
 
         fn assert_inhibited(&self, action: &str) -> Transaction {
             let res = self.assert_fail(action);
-            assert!(res.inhibited.unwrap(), "expected inhibited");
+            assert!(res.inhibited, "expected inhibited");
             res
         }
 
         fn assert_fail(&self, action: &str) -> Transaction {
             let res = self.model.vm.transform(&self.state, action, 1);
-            println!("{:?}", res);
             assert!(res.is_err(), "expected fail");
             res
         }
 
         fn assert_pass(&mut self, action: &str) -> Transaction {
             let res = self.model.vm.transform(&self.state, action, 1);
-            println!("{:?}", res);
             assert!(res.is_ok(), "expected pass");
             self.state = res.output.clone();
             res
@@ -205,19 +200,20 @@ mod tests {
     #[test]
     fn test_loading_dsl() {
         let m = &mut TestModel::new();
-        println!("{}", m.to_link());
-        m.assert_pass("bar");
-        // FIXME inhibited flags not working
-        // m.assert_inhibited("baz");
+        assert_eq!(m.state, vec![1]);
 
+        println!("link: {}", m.to_link()); // compare w/ GUI
+
+        m.assert_inhibited("bar");
+        m.assert_inhibited("baz");
         m.assert_pass("inc");
         m.assert_pass("inc");
+        m.assert_pass("bar"); // enabled
         m.assert_overflow("inc"); // fail due to capacity
         m.assert_pass("dec");
         m.assert_pass("dec");
         m.assert_pass("dec");
-
-        // FIXME inhibited flags not working
-        // m.assert_underflow("dec");
+        m.assert_underflow("dec");
+        m.assert_pass("baz"); // enabled
     }
 }

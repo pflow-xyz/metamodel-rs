@@ -12,6 +12,20 @@ pub type RoleMap = HashMap<String, bool>;
 /// It is used to represent the state of a state machine and the delta of each transition or inhibitor.
 pub type Vector = Vec<i32>;
 
+/// ModelType is an enum that represents the type of model.
+/// It is used to determine the type of state machine to use.
+/// The possible values are `PetriNet`, `Elementary`, and `Workflow`.
+/// The default value is `PetriNet`.
+/// The `Elementary` model is a simplified version of the `PetriNet` model.
+/// The `Workflow` model is a simplified version of the `Elementary` model.
+/// The `PetriNet` model is the most complex and general model.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ModelType {
+    PetriNet,
+    Elementary,
+    Workflow,
+}
+
 /// Guard is a struct that represents a guard in a state machine.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Guard {
@@ -50,6 +64,7 @@ pub type TransitionMap = HashMap<String, Transition>;
 /// StateMachine is a struct that holds the vectorized / executable form of a Petri-net.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateMachine {
+    pub model_type: ModelType,
     pub initial: Vector,
     pub capacity: Vector,
     pub places: Vec<String>,
@@ -57,14 +72,44 @@ pub struct StateMachine {
     pub roles: RoleMap,
 }
 
+fn model_type_from_string(model_type: &str) -> ModelType {
+    match model_type {
+        "elementary" => ModelType::Elementary,
+        "workflow" => ModelType::Workflow,
+        _ => ModelType::PetriNet,
+    }
+}
+
+fn vector_add(capacity: &Vector, state: &Vector, delta: &Vector, multiple: i32) -> (Vector, bool, bool, bool) {
+    let mut overflow = false;
+    let mut underflow = false;
+    let mut out: Vector = Vec::new();
+    let mut ok = true;
+    for i in 0..state.len() {
+        out.push(state[i] + delta.get(i).unwrap_or(&0) * multiple);
+        if out[i] < 0 {
+            underflow = true;
+            ok = false; // underflow: contains negative
+        } else if capacity[i] > 0 && capacity[i] - out[i] < 0 {
+            overflow = true;
+            ok = false; // overflow: exceeds capacity
+        }
+    }
+    (out, ok, overflow, underflow)
+}
+
 impl StateMachine {
     /// Creates a new `StateMachine` object from the given `PetriNet`.
     pub fn new(declaration: fn(&mut dyn FlowDsl)) -> Self {
-        PetriNet::new().declare(declaration).as_vasm()
+        let net = &mut PetriNet::new();
+        let mut sm = net.declare(declaration).as_vasm();
+        sm.model_type = model_type_from_string(&net.model_type);
+        return sm;
     }
 
     /// Creates a new `StateMachine` object from the given `PetriNet`.
     pub fn from_model(model: &mut PetriNet) -> Self {
+        let model_type = model_type_from_string(&model.model_type);
         model.populate_arc_attributes();
         let mut roles = RoleMap::new();
         model.transitions.iter().for_each(|(_, v)| {
@@ -98,32 +143,32 @@ impl StateMachine {
             let produce = arc.produce.unwrap_or(false);
             let inhibit = arc.inhibit.unwrap_or(false);
             let read = arc.read.unwrap_or(false);
-            if inhibit {
-                if read {
-                    transitions.get_mut(&source).unwrap().guards.insert(
-                        target.clone(),
-                        Guard {
-                            delta: vec![0; vector_size],
-                            read: read,
-                        },
-                    );
-                } else {
-                    transitions.get_mut(&target).unwrap().guards.insert(
-                        source.clone(),
-                        Guard {
-                            delta: vec![0; vector_size],
-                            read: read,
-                        },
-                    );
-                }
+
+            let p = if read || produce {
+                model.places.get(&target)
             } else {
-                assert_ne!(produce, consume, "must be either produce or consume");
+                model.places.get(&source)
+            }.unwrap();
+
+            let t = if read || produce {
+                transitions.get_mut(&source)
+            } else {
+                transitions.get_mut(&target)
+            }.unwrap();
+
+            let delta = &mut vec![0; vector_size];
+            delta[p.offset as usize] = 0 - weight;
+
+            if inhibit {
+                t.guards.insert(
+                    target.clone(),
+                    Guard { delta: delta.clone(), read },
+                );
+            } else {
                 if consume {
-                    transitions.get_mut(&target).unwrap().delta
-                        [model.places.get(&source).unwrap().offset as usize] = 0 - weight;
+                    t.delta[model.places.get(&source).unwrap().offset as usize] = 0 - weight;
                 } else {
-                    transitions.get_mut(&source).unwrap().delta
-                        [model.places.get(&target).unwrap().offset as usize] = weight;
+                    t.delta[model.places.get(&target).unwrap().offset as usize] = weight;
                 }
             }
         });
@@ -133,18 +178,113 @@ impl StateMachine {
         let mut places = vec!["".to_string(); vector_size];
 
         model.places.iter().for_each(|(k, v)| {
-            initial[v.offset as usize] = v.initial.unwrap_or(0);
-            capacity[v.offset as usize] = v.capacity.unwrap_or(0);
+            let i = v.initial.unwrap_or(0);
+            assert!(i >= 0, "initial must be non-negative");
+
+            initial[v.offset as usize] = match model_type {
+                ModelType::PetriNet => i,
+                ModelType::Elementary => match i {
+                    0 => 0,
+                    _ => 1,
+                },
+                ModelType::Workflow => match i {
+                    0 => 0,
+                    _ => 1,
+                },
+            };
+
+            capacity[v.offset as usize] = match model_type {
+                ModelType::PetriNet => v.capacity.unwrap_or(0),
+                ModelType::Elementary => 1,
+                ModelType::Workflow => 1,
+            };
             places[v.offset as usize] = k.clone();
         });
 
-        // REVIEW: assume maps iterate in the same order?
         Self {
+            model_type: model_type_from_string(&model.model_type),
             initial,
             capacity,
             places,
             transitions,
             roles,
+        }
+    }
+
+    fn guard_fails(&self, state: &Vector, transition: &Transition, multiple: i32) -> Result<bool, &'static str> {
+        for (_, guard) in &transition.guards {
+            let (_, ok, _, _) = vector_add(&self.capacity, state, &guard.delta, multiple);
+            if guard.read {
+                return Ok(!ok); // guard inhibits until a minimum threshold
+            } else {
+                return Ok(ok); // read arc enables after a minimum threshold
+            }
+        }
+        Ok(false)
+    }
+    pub fn petri_net_fire(&self, state: &Vector, transition: &Transition, multiple: i32) -> Transaction {
+        let role = transition.role.clone();
+        let (output, ok, overflow, underflow) = vector_add(&self.capacity, state, &transition.delta, multiple);
+        let inhibited = self.guard_fails(state, transition, multiple).unwrap();
+
+        Transaction {
+            output,
+            ok: ok && !inhibited,
+            role,
+            inhibited,
+            overflow,
+            underflow,
+        }
+    }
+
+    pub fn elementary_fire(&self, state: &Vector, transition: &Transition, multiple: i32) -> Transaction {
+        let role = transition.role.clone();
+        let (output, ok, overflow, underflow) = vector_add(&self.capacity, state, &transition.delta, multiple);
+        let inhibited = self.guard_fails(state, transition, multiple).unwrap_or(false);
+        let output_state_count = output.iter().filter(|&x| *x > 0).count();
+        let elementary_ok = ok && output_state_count == 1 && !inhibited;
+        Transaction {
+            output,
+            ok: elementary_ok,
+            role,
+            inhibited,
+            overflow,
+            underflow,
+        }
+    }
+
+    pub fn workflow_fire(&self, state: &Vector, transition: &Transition, multiple: i32) -> Transaction {
+        let role = transition.role.clone();
+        let (output, ok, overflow, underflow) = vector_add(&self.capacity, state, &transition.delta, multiple);
+        let inhibited = self.guard_fails(state, transition, multiple).unwrap();
+        let workflow_output = output.iter().map(|x| {
+            match x {
+                0 => 0,
+                1 => 1, //
+                2 => 1, // allow reentry
+                _ => 1, // no other values allowed
+            }
+        }).collect::<Vec<i32>>();
+        let output_state_count = workflow_output.iter().filter(|&x| *x > 0).count();
+        if !inhibited && overflow && output_state_count == 1 && transition.allow_reentry {
+            return Transaction {
+                output: workflow_output,
+                ok: true,
+                role,
+                inhibited,
+                overflow: false,
+                underflow,
+            };
+        }
+        let workflow_ok = ok && output_state_count == 1 && !inhibited;
+
+        Transaction {
+            output,
+            ok: workflow_ok,
+            role,
+            inhibited,
+            overflow,
+            underflow,
         }
     }
 }
@@ -160,11 +300,11 @@ pub struct Transaction {
     /// The role that performed the transformation.
     pub role: String,
     /// An optional boolean indicating whether the transformation was inhibited.
-    pub inhibited: Option<bool>,
+    pub inhibited: bool,
     /// An optional boolean indicating whether an overflow occurred during the transformation.
-    pub overflow: Option<bool>,
+    pub overflow: bool,
     /// An optional boolean indicating whether an underflow occurred during the transformation.
-    pub underflow: Option<bool>,
+    pub underflow: bool,
 }
 
 impl Transaction {
@@ -237,55 +377,11 @@ impl Vasm for StateMachine {
             .transitions
             .get(action)
             .unwrap_or_else(|| panic!("no transition for {}", action));
-        let mut output = state.clone();
-        let mut ok = true;
-        let role = transition.role.clone();
-        let mut inhibited = None;
-        let mut overflow = None;
-        let mut underflow = None;
-        for (i, v) in transition.delta.iter().enumerate() {
-            output[i] += v * multiple;
-            if output[i] < 0 {
-                underflow = Some(true);
-                ok = false;
-            }
-            if output[i] > self.capacity[i] {
-                ok = false;
-                overflow = Some(true);
-            }
-        }
-        for (_, v) in transition.guards.iter() {
-            let guard = v;
-            let mut sum = Vector::new();
-            for (i, w) in guard.delta.iter().enumerate() {
-                sum.push(output[i] + w * multiple);
-            }
-            // FIXME likely this is wrong...
-            // if guard.read {
-            //     if sum > 0 {
-            //         ok = false;
-            //         inhibited = Some(true);
-            //     }
-            // } else {
-            //     if sum <= 0 {
-            //         ok = false;
-            //         inhibited = Some(false);
-            //     }
-            // }
-        }
-        for (_, v) in output.iter().enumerate() {
-            if v.to_be() < 0 {
-                ok = false;
-                underflow = Some(true);
-            }
-        }
-        Transaction {
-            output,
-            ok,
-            role,
-            inhibited,
-            overflow,
-            underflow,
+
+        match self.model_type {
+            ModelType::PetriNet => self.petri_net_fire(state, transition, multiple),
+            ModelType::Elementary => self.elementary_fire(state, transition, multiple),
+            ModelType::Workflow => self.workflow_fire(state, transition, multiple),
         }
     }
 }
