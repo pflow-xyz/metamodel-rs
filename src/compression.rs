@@ -42,6 +42,7 @@ pub fn compress_brotli_encode(data: &str) -> String {
 #[cfg(test)]
 mod tests {
     use crate::fixtures::{DINING_PHILOSOPHERS};
+    use crate::petri_net::PetriNet;
 
     use super::*;
 
@@ -51,5 +52,14 @@ mod tests {
         println!("encoded: http://localhost:3000/?z={:}", encoded);
         let decoded = decompress_brotli_decode(&encoded).unwrap();
         assert_eq!(decoded, DINING_PHILOSOPHERS);
+    }
+
+    #[test]
+    fn test_unzip_url() {
+        let url = "http://localhost:3000/?z=GzkCIBwHdqMPWUYyo7XgaT/B09w+1fHywu1u31IMRQwiCxaRsTAxQRT6UodF4e9vcmthITygLrPfojnB4nxsskw21O/iE3GRG82+n/aPgzT++TW8fY5765PjEAvRHLk1fa0Atw8uCVzrgniE9AOCxwJt0eNbZxX3GlCwKSXlDBVIj2qWMSpoWCuQ0SZF4WJKQu7IYz8DzVzPNGg5hqbWWqtzXBixNz9qkiODzShUClkETwDocbjtBJp9Wh5QW8T8PXrgq9nCDI3qaA==";
+        let decoded = decompress_encoded_url(url).unwrap();
+        let net = PetriNet::from_json(decoded.clone()).unwrap();
+        assert_eq!(net.places.len(), 4);
+        assert_eq!(net.transitions.len(), 1);
     }
 }
