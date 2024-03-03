@@ -83,19 +83,19 @@ fn model_type_from_string(model_type: &str) -> ModelType {
 fn vector_add(capacity: &Vector, state: &Vector, delta: &Vector, multiple: i32) -> (Vector, bool, bool, bool) {
     let mut overflow = false;
     let mut underflow = false;
-    let mut out: Vector = Vec::new();
+    let mut output: Vector = Vec::new();
     let mut ok = true;
     for i in 0..state.len() {
-        out.push(state[i] + delta.get(i).unwrap_or(&0) * multiple);
-        if out[i] < 0 {
+        output.push(state[i] + delta.get(i).unwrap_or(&0) * multiple);
+        if output[i] < 0 {
             underflow = true;
             ok = false; // underflow: contains negative
-        } else if capacity[i] > 0 && capacity[i] - out[i] < 0 {
+        } else if capacity[i] > 0 && capacity[i] - output[i] < 0 {
             overflow = true;
             ok = false; // overflow: exceeds capacity
         }
     }
-    (out, ok, overflow, underflow)
+    (output, ok, overflow, underflow)
 }
 
 impl StateMachine {
@@ -211,14 +211,15 @@ impl StateMachine {
         }
     }
 
+    /// Checks if any guard fails for the given state and transition.
     fn guard_fails(&self, state: &Vector, transition: &Transition, multiple: i32) -> Result<bool, &'static str> {
         for (_, guard) in &transition.guards {
-            let (_, ok, _, _) = vector_add(&self.capacity, state, &guard.delta, multiple);
-            if guard.read {
-                return Ok(!ok); // guard inhibits until a minimum threshold
+            let (_, threshold_met, _, _) = vector_add(&self.capacity, state, &guard.delta, multiple);
+            return if guard.read {
+                Ok(!threshold_met) // read arc enables after a threshold
             } else {
-                return Ok(ok); // read arc enables after a minimum threshold
-            }
+                Ok(threshold_met) // guard inhibits until a threshold
+            };
         }
         Ok(false)
     }
@@ -259,8 +260,9 @@ impl StateMachine {
         let inhibited = self.guard_fails(state, transition, multiple).unwrap();
         let workflow_output = output.iter().map(|x| {
             match x {
+                -1 => 0, // allow retry / reentry
                 0 => 0,
-                1 => 1, //
+                1 => 1,
                 2 => 1, // allow reentry
                 _ => 1, // no other values allowed
             }
