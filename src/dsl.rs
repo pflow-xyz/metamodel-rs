@@ -15,8 +15,8 @@ use crate::vasm::StateMachine;
 /// # Example
 ///
 /// ```
-/// use metamodel::dsl::FlowDsl;
-/// use metamodel::vasm::Vasm;
+/// use pflow_metamodel::dsl::FlowDsl;
+/// use pflow_metamodel::vasm::Vasm;
 /// fn model_test_code(p: &mut dyn FlowDsl) {
 ///     p.model_type("petriNet");
 ///
