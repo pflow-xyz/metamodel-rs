@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::compression::{encode_zip, unzip_encoded};
+use crate::compression::{compress_brotli_encode, decompress_brotli_decode};
 use crate::oid::Oid;
 use crate::petri_net::PetriNet;
 
@@ -42,9 +42,6 @@ impl Default for Zblob {
     }
 }
 
-/// The filename used to store the model in the zip file.
-pub const ZBLOB_NET: &str = "model.json";
-
 impl Zblob {
     pub fn from_string(encoded_zip: Option<&str>) -> Self {
         let mut zblob = Zblob::default();
@@ -59,12 +56,12 @@ impl Zblob {
     }
     pub fn from_net(net: &PetriNet) -> Self {
         let net_json = net.to_json().unwrap();
-        let data = encode_zip(&net_json, ZBLOB_NET);
+        let data = compress_brotli_encode(&net_json);
         return Self::from_string(Some(&data));
     }
 
     pub fn to_net(&self) -> PetriNet {
-        let decoded = unzip_encoded(&self.base64_zipped, ZBLOB_NET).unwrap();
+        let decoded = decompress_brotli_decode(&self.base64_zipped).unwrap();
         return serde_json::from_str(&decoded).unwrap();
     }
 }

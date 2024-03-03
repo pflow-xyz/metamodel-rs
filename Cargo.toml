@@ -15,6 +15,7 @@ path = "src/lib.rs"
 
 [dependencies]
 base64 = "0.21.7"
+brotli = "3.4.0"
 cjson = "0.1.2"
 libipld = "0.16.0"
 multibase = "0.9.1"

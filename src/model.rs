@@ -48,7 +48,7 @@ mod tests {
         let zblob = model.net.to_zblob();
         assert_eq!(
             zblob.ipfs_cid,
-            "zb2rhkw6QcSejeXGWoyrkR8c9BP5VRyz5tuADYvJUVZ6ai5MP"
+            "zb2rhXz6Zi73pN9tyWzNGCLUCd9MLvAkupcBKXpCvrV87Rch4"
         );
 
         let r = model.vm.roles.get("default").unwrap();

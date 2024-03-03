@@ -223,7 +223,7 @@ mod tests {
         assert_eq!(net.places.len(), 15);
         assert_eq!(
             zblob.ipfs_cid,
-            "zb2rhdKgNC4tV6w6fEaoTnB4zSYkFdcpmk37DpdBDM9huTb1b"
+            "zb2rhbJgSpkiifamgPLnyfEDxRKRBjPru2ojyYSBMitPNjXTx"
         );
     }
 }
