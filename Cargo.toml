@@ -1,10 +1,10 @@
 [package]
-name = "metamodel"
+name = "pflow-metamodel"
 version = "0.1.0"
 edition = "2021"
 description = "Declarative Petri-nets using a rust DSL"
 license = "MIT"
-documentation = "https://docs.rs/metamodel"
+documentation = "https://docs.rs/pflow-metamodel"
 homepage = "https://pflow.dev"
 repository = "https://github.com/pflow-dev/metamodel-rs"
 
