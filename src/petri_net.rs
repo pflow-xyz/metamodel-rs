@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use cjson;
 use serde::{Deserialize, Serialize};
 use serde_json::Error;
 
