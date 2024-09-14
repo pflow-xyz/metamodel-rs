@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::dsl::FlowDsl;
+use crate::dsl::Dsl;
 use crate::petri_net::PetriNet;
 
 /// RoleMap is a type alias for a HashMap that maps a string to a boolean.
@@ -19,7 +19,7 @@ pub type Vector = Vec<i32>;
 /// The `Elementary` model is a simplified version of the `PetriNet` model.
 /// The `Workflow` model is a simplified version of the `Elementary` model.
 /// The `PetriNet` model is the most complex and general model.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ModelType {
     PetriNet,
     Elementary,
@@ -37,7 +37,7 @@ pub struct Guard {
 pub type GuardMap = HashMap<String, Guard>;
 
 /// Transition is a struct that represents a transition in a state machine.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Transition {
     label: String,
     role: String,
@@ -46,17 +46,6 @@ pub struct Transition {
     allow_reentry: bool,
 }
 
-impl Default for Transition {
-    fn default() -> Self {
-        Self {
-            label: "".to_string(),
-            role: "".to_string(),
-            delta: vec![],
-            guards: GuardMap::new(),
-            allow_reentry: false,
-        }
-    }
-}
 
 /// TransitionMap is a type alias for a HashMap that maps a string to a `Transition`.
 pub type TransitionMap = HashMap<String, Transition>;
@@ -80,7 +69,12 @@ fn model_type_from_string(model_type: &str) -> ModelType {
     }
 }
 
-fn vector_add(capacity: &Vector, state: &Vector, delta: &Vector, multiple: i32) -> (Vector, bool, bool, bool) {
+fn vector_add(
+    capacity: &Vector,
+    state: &Vector,
+    delta: &Vector,
+    multiple: i32,
+) -> (Vector, bool, bool, bool) {
     let mut overflow = false;
     let mut underflow = false;
     let mut output: Vector = Vec::new();
@@ -100,20 +94,24 @@ fn vector_add(capacity: &Vector, state: &Vector, delta: &Vector, multiple: i32) 
 
 impl StateMachine {
     /// Creates a new `StateMachine` object from the given `PetriNet`.
-    pub fn new(declaration: fn(&mut dyn FlowDsl)) -> Self {
+    pub fn new(declaration: fn(&mut dyn Dsl)) -> Self {
         let net = &mut PetriNet::new();
         let mut sm = net.declare(declaration).as_vasm();
         sm.model_type = model_type_from_string(&net.model_type);
-        return sm;
+        sm
     }
 
     /// Creates a new `StateMachine` object from the given `PetriNet`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if petri net is not valid.
     pub fn from_model(model: &mut PetriNet) -> Self {
         let model_type = model_type_from_string(&model.model_type);
         model.populate_arc_attributes();
         let mut roles = RoleMap::new();
         model.transitions.iter().for_each(|(_, v)| {
-            roles.insert(v.role.clone().unwrap_or("default".to_string()), true);
+            roles.insert(v.role.clone().unwrap_or_else(|| "default".to_string()), true);
         });
 
         let vector_size = model.places.len();
@@ -126,7 +124,7 @@ impl StateMachine {
                     k.clone(),
                     Transition {
                         label: k.clone(),
-                        role: v.role.clone().unwrap_or("default".to_string()),
+                        role: v.role.clone().unwrap_or_else(|| "default".to_string()),
                         delta: vec![0; vector_size],
                         guards: GuardMap::new(),
                         allow_reentry: false,
@@ -148,57 +146,59 @@ impl StateMachine {
                 model.places.get(&target)
             } else {
                 model.places.get(&source)
-            }.unwrap();
+            }
+                .expect("place not found");
 
             let t = if read || produce {
                 transitions.get_mut(&source)
             } else {
                 transitions.get_mut(&target)
-            }.unwrap();
+            }
+                .expect("transition not found");
 
             let delta = &mut vec![0; vector_size];
-            delta[p.offset as usize] = 0 - weight;
-
+            let offset_result: usize = p.offset.try_into().expect("invalid offset");
+            delta[offset_result] = 0 - weight;
             if inhibit {
                 t.guards.insert(
                     target.clone(),
-                    Guard { delta: delta.clone(), read },
+                    Guard {
+                        delta: delta.clone(),
+                        read,
+                    },
                 );
+            } else if consume {
+                let offset: usize = p.offset.try_into().expect("invalid offset");
+                t.delta[offset] = 0 - weight;
             } else {
-                if consume {
-                    t.delta[model.places.get(&source).unwrap().offset as usize] = 0 - weight;
-                } else {
-                    t.delta[model.places.get(&target).unwrap().offset as usize] = weight;
-                }
+                let offset: usize = p.offset.try_into().expect("invalid offset");
+                t.delta[offset] = weight;
             }
         });
 
         let mut initial = vec![0; vector_size];
         let mut capacity = vec![0; vector_size];
-        let mut places = vec!["".to_string(); vector_size];
+        let mut places = vec![String::new(); vector_size];
 
         model.places.iter().for_each(|(k, v)| {
             let i = v.initial.unwrap_or(0);
             assert!(i >= 0, "initial must be non-negative");
 
-            initial[v.offset as usize] = match model_type {
+            let offset_result: usize = v.offset.try_into().expect("invalid offset");
+            initial[offset_result] = match model_type {
                 ModelType::PetriNet => i,
-                ModelType::Elementary => match i {
-                    0 => 0,
-                    _ => 1,
-                },
-                ModelType::Workflow => match i {
+                ModelType::Workflow | ModelType::Elementary => match i {
                     0 => 0,
                     _ => 1,
                 },
             };
 
-            capacity[v.offset as usize] = match model_type {
+            let offset_result: usize = v.offset.try_into().expect("invalid offset");
+            capacity[offset_result] = match model_type {
                 ModelType::PetriNet => v.capacity.unwrap_or(0),
-                ModelType::Elementary => 1,
-                ModelType::Workflow => 1,
+                ModelType::Elementary | ModelType::Workflow => 1,
             };
-            places[v.offset as usize] = k.clone();
+            places[offset_result].clone_from(k);
         });
 
         Self {
@@ -211,22 +211,30 @@ impl StateMachine {
         }
     }
 
-    /// Checks if any guard fails for the given state and transition.
-    fn guard_fails(&self, state: &Vector, transition: &Transition, multiple: i32) -> Result<bool, &'static str> {
-        for (_, guard) in &transition.guards {
-            let (_, threshold_met, _, _) = vector_add(&self.capacity, state, &guard.delta, multiple);
-            return if guard.read {
-                Ok(!threshold_met) // read arc enables after a threshold
-            } else {
-                Ok(threshold_met) // guard inhibits until a threshold
-            };
+    fn guard_fails(&self, state: &Vector, transition: &Transition, multiple: i32) -> bool {
+        for guard in transition.guards.values() {
+            let (_, threshold_met, _, _) =
+                vector_add(&self.capacity, state, &guard.delta, multiple);
+            if guard.read {
+                if !threshold_met {
+                    return true; // read arc enables after a threshold
+                }
+            } else if threshold_met {
+                return true; // guard inhibits until a threshold
+            }
         }
-        Ok(false)
+        false
     }
-    pub fn petri_net_fire(&self, state: &Vector, transition: &Transition, multiple: i32) -> Transaction {
+    pub fn petri_net_fire(
+        &self,
+        state: &Vector,
+        transition: &Transition,
+        multiple: i32,
+    ) -> Transaction {
         let role = transition.role.clone();
-        let (output, ok, overflow, underflow) = vector_add(&self.capacity, state, &transition.delta, multiple);
-        let inhibited = self.guard_fails(state, transition, multiple).unwrap();
+        let (output, ok, overflow, underflow) =
+            vector_add(&self.capacity, state, &transition.delta, multiple);
+        let inhibited = self.guard_fails(state, transition, multiple);
 
         Transaction {
             output,
@@ -238,10 +246,16 @@ impl StateMachine {
         }
     }
 
-    pub fn elementary_fire(&self, state: &Vector, transition: &Transition, multiple: i32) -> Transaction {
+    pub fn elementary_fire(
+        &self,
+        state: &Vector,
+        transition: &Transition,
+        multiple: i32,
+    ) -> Transaction {
         let role = transition.role.clone();
-        let (output, ok, overflow, underflow) = vector_add(&self.capacity, state, &transition.delta, multiple);
-        let inhibited = self.guard_fails(state, transition, multiple).unwrap_or(false);
+        let (output, ok, overflow, underflow) =
+            vector_add(&self.capacity, state, &transition.delta, multiple);
+        let inhibited = self.guard_fails(state, transition, multiple);
         let output_state_count = output.iter().filter(|&x| *x > 0).count();
         let elementary_ok = ok && output_state_count == 1 && !inhibited;
         Transaction {
@@ -254,19 +268,25 @@ impl StateMachine {
         }
     }
 
-    pub fn workflow_fire(&self, state: &Vector, transition: &Transition, multiple: i32) -> Transaction {
+    pub fn workflow_fire(
+        &self,
+        state: &Vector,
+        transition: &Transition,
+        multiple: i32,
+    ) -> Transaction {
         let role = transition.role.clone();
-        let (output, ok, overflow, underflow) = vector_add(&self.capacity, state, &transition.delta, multiple);
-        let inhibited = self.guard_fails(state, transition, multiple).unwrap();
-        let workflow_output = output.iter().map(|x| {
-            match x {
-                -1 => 0, // allow retry / reentry
-                0 => 0,
-                1 => 1,
-                2 => 1, // allow reentry
-                _ => 1, // no other values allowed
-            }
-        }).collect::<Vec<i32>>();
+        let (output, ok, overflow, underflow) =
+            vector_add(&self.capacity, state, &transition.delta, multiple);
+        let inhibited = self.guard_fails(state, transition, multiple);
+        let workflow_output = output
+            .iter()
+            .map(|x| {
+                match x {
+                    0 | -1 => 0, // allow retry / reentry
+                    _ => 1, // no other values allowed
+                }
+            })
+            .collect::<Vec<i32>>();
         let output_state_count = workflow_output.iter().filter(|&x| *x > 0).count();
         if !inhibited && overflow && output_state_count == 1 && transition.allow_reentry {
             return Transaction {
@@ -316,11 +336,11 @@ impl Transaction {
     ///
     /// * A boolean indicating whether the transaction was successful.
     ///
-    pub fn is_ok(&self) -> bool {
+    pub const fn is_ok(&self) -> bool {
         self.ok
     }
 
-    pub fn is_err(&self) -> bool {
+    pub const fn is_err(&self) -> bool {
         !self.ok
     }
 }
@@ -359,7 +379,7 @@ pub trait Vasm {
 }
 
 impl dyn Vasm {
-    pub fn new(declaration: fn(&mut dyn FlowDsl)) -> Box<Self> {
+    pub fn new(declaration: fn(&mut dyn Dsl)) -> Box<Self> {
         Box::from(PetriNet::new().declare(declaration).as_vasm())
     }
 }
@@ -378,12 +398,12 @@ impl Vasm for StateMachine {
         let transition = self
             .transitions
             .get(action)
-            .unwrap_or_else(|| panic!("no transition for {}", action));
+            .unwrap_or_else(|| panic!("no transition for {action}"));
 
         match self.model_type {
-            ModelType::PetriNet => self.petri_net_fire(state, transition, multiple),
             ModelType::Elementary => self.elementary_fire(state, transition, multiple),
             ModelType::Workflow => self.workflow_fire(state, transition, multiple),
+            ModelType::PetriNet => self.petri_net_fire(state, transition, multiple),
         }
     }
 }
@@ -396,5 +416,5 @@ fn test_default_net() {
     });
     let vasm = mm.as_vasm();
     let state = vasm.initial_vector();
-    assert!(state.len() == 0);
+    assert!(state.is_empty());
 }

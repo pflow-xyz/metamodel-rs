@@ -1,6 +1,6 @@
 [package]
 name = "pflow-metamodel"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 description = "Declarative Petri-nets using a rust DSL"
 license = "MIT"
@@ -17,6 +17,7 @@ path = "src/lib.rs"
 base64 = "0.21.7"
 brotli = "3.4.0"
 cjson = "0.1.2"
+embed-doc-image = "0.1.4"
 libipld = "0.16.0"
 multibase = "0.9.1"
 serde = { version = "1.0", features = ["derive"] }

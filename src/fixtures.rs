@@ -1,5 +1,5 @@
 /// This is a petri net model that represents the dining philosophers problem using chopsticks and philosophers.
-pub const DINING_PHILOSOPHERS: &'static str = r#"
+pub const DINING_PHILOSOPHERS: &str = r#"
 {
     "modelType": "petriNet",
     "version": "v0",

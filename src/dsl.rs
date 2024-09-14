@@ -15,9 +15,9 @@ use crate::vasm::StateMachine;
 /// # Example
 ///
 /// ```
-/// use pflow_metamodel::dsl::FlowDsl;
+/// use pflow_metamodel::dsl::Dsl;
 /// use pflow_metamodel::vasm::Vasm;
-/// fn model_test_code(p: &mut dyn FlowDsl) {
+/// fn model_test_code(p: &mut dyn Dsl) {
 ///     p.model_type("petriNet");
 ///
 ///     let r = "default";
@@ -31,7 +31,7 @@ use crate::vasm::StateMachine;
 ///
 /// let model = <dyn Vasm>::new(model_test_code);
 /// ```
-pub trait FlowDsl {
+pub trait Dsl {
     /// Sets the model type of the Petri net.
     fn model_type(&mut self, model_type: &str);
     /// Adds a cell (place) to the Petri net.
@@ -89,7 +89,7 @@ impl<'a> Builder<'a> {
     }
 }
 
-impl<'a> FlowDsl for Builder<'a> {
+impl Dsl for Builder<'_> {
     fn model_type(&mut self, model_type: &str) {
         self.net.model_type = model_type.to_string();
     }
@@ -102,25 +102,52 @@ impl<'a> FlowDsl for Builder<'a> {
         x: i32,
         y: i32,
     ) -> &'b str {
-        let offset = self.net.places.len() as i32;
+        let offset: i32 = self.net.places.len().try_into().expect("too many places");
         self.net.add_place(label, offset, initial, capacity, x, y);
-        return label;
+        label
     }
 
     fn func<'b>(&mut self, label: &'b str, role: &str, x: i32, y: i32) -> &'b str {
         self.net.add_transition(label, role, x, y);
-        return label;
+        label
     }
 
     fn arrow(&mut self, source: &str, target: &str, weight: i32) {
         assert!(weight > 0, "weight must be positive");
-        self.net.add_arc(source, target, Some(weight), None, None, None, None);
+        self.net
+            .add_arc(ArcParams {
+                source,
+                target,
+                weight: Some(weight),
+                consume: None,
+                produce: None,
+                inhibit: None,
+                read: None,
+            });
     }
 
     fn guard(&mut self, source: &str, target: &str, weight: i32) {
         assert!(weight > 0, "weight must be positive");
-        self.net.add_arc(source, target, Some(weight), Some(true), None, Some(true), None);
+        self.net.add_arc(ArcParams {
+            source,
+            target,
+            weight: Some(weight),
+            consume: Some(true),
+            produce: None,
+            inhibit: Some(true),
+            read: None,
+        });
     }
+}
+
+pub struct ArcParams<'a> {
+    pub source: &'a str,
+    pub target: &'a str,
+    pub weight: Option<i32>,
+    pub consume: Option<bool>,
+    pub produce: Option<bool>,
+    pub inhibit: Option<bool>,
+    pub read: Option<bool>,
 }
 
 #[cfg(test)]
@@ -137,16 +164,17 @@ mod tests {
 
     impl TestModel {
         fn to_link(&self) -> String {
-            format!("{}{}", "https://pflow.dev/p/?z=", self.model.net.to_zblob().base64_zipped.replace(" ", "+"))
+            format!(
+                "{}{}",
+                "http://example.com/?z=",
+                self.model.net.to_zblob().base64_zipped.replace(' ', "+")
+            )
         }
 
         fn new() -> Self {
             let model = Model::new(model_test_code);
-            let state = model.vm.initial_vector().clone();
-            Self {
-                model,
-                state,
-            }
+            let state = model.vm.initial_vector();
+            Self { model, state }
         }
 
         fn assert_underflow(&self, action: &str) -> Transaction {
@@ -176,12 +204,12 @@ mod tests {
         fn assert_pass(&mut self, action: &str) -> Transaction {
             let res = self.model.vm.transform(&self.state, action, 1);
             assert!(res.is_ok(), "expected pass");
-            self.state = res.output.clone();
+            self.state.clone_from(&res.output);
             res
         }
     }
 
-    fn model_test_code(p: &mut dyn FlowDsl) {
+    fn model_test_code(p: &mut dyn Dsl) {
         p.model_type("petriNet");
 
         let r = "default";
