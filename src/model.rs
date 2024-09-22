@@ -19,9 +19,58 @@ impl Model {
         }
     }
 
+    /// Use pflow DSL to declare a function that defines the model
+    ///
+    /// This is the same logic as the `new` function, but it allows
+    /// for chaining
     pub fn declare(&mut self, func: fn(&mut dyn Dsl)) -> &mut Model {
         self.declaration.push(func);
         self.vm = Box::new(self.net.declare(func).as_vasm());
         self
+    }
+
+    ///  Parse a diagram into a PetriNet
+    ///
+    /// # Panics
+    ///
+    /// Panics if the diagram is not valid
+    pub fn from_diagram(contents: String) -> Self {
+        let mut net = PetriNet::from_diagram(contents);
+        let vm = Box::new(net.declare(|_| {}).as_vasm());
+        Self {
+            net,
+            declaration: Vec::new(),
+            vm,
+        }
+    }
+
+    /// Parse a JSON value into a PetriNet
+    ///
+    /// # Panics
+    ///
+    /// Panics if the JSON value cannot be parsed
+    pub fn from_json_value(value: serde_json::Value) -> Self {
+        let mut net = PetriNet::from_json_value(value).expect("Failed to parse JSON");
+        let vm = Box::new(net.declare(|_| {}).as_vasm());
+        Self {
+            net,
+            declaration: Vec::new(),
+            vm,
+        }
+    }
+
+    /// Parse a JSON string into a PetriNet
+    ///
+    /// # Panics
+    ///
+    /// Panics if the JSON string cannot be parsed
+    pub fn from_json_str(value: &str) -> Self {
+        let mut net = PetriNet::from_json_str(value).expect("Failed to parse JSON");
+        let vm = Box::new(net.declare(|_| {}).as_vasm());
+        Self {
+            net,
+            declaration: Vec::new(),
+            vm,
+        }
     }
 }

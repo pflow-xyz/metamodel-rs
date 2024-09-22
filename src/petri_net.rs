@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-
-use serde::{Deserialize, Serialize};
-use serde_json::{Error, Value};
-
 use crate::dsl::{ArcParams, Builder, Dsl};
 use crate::zblob::Zblob;
+use serde::{Deserialize, Serialize};
+use serde_json::{Error, Value};
+use std::collections::HashMap;
+use std::convert::TryInto;
 
 /// PetriNet stores petri-net elements used during the construction of a petri-net.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -41,19 +40,20 @@ impl PetriNet {
     }
 
     /// Creates a new `PetriNet` object from the given JSON value.
-    pub fn from_json(contents: Value) -> Result<Self, Error> {
+    pub fn from_json_value(contents: Value) -> Result<Self, Error> {
         let mut petri_net: PetriNet = serde_json::from_value(contents)?;
         petri_net.populate_arc_attributes();
         Ok(petri_net)
     }
 
     /// Creates a new `PetriNet` object from the given JSON string.
-    pub fn from_json_str(contents: String) -> Result<Self, Error> {
-        let mut petri_net: PetriNet = serde_json::from_str(&contents)?;
+    pub fn from_json_str(contents: &str) -> Result<Self, Error> {
+        let mut petri_net: PetriNet = serde_json::from_str(contents)?;
         petri_net.populate_arc_attributes();
         Ok(petri_net)
     }
 
+    /// Converts the `PetriNet` to a JSON value.
     pub fn to_json(&self) -> Result<Value, Error> {
         serde_json::to_value(self)
     }
@@ -66,6 +66,86 @@ impl PetriNet {
     /// Converts the `PetriNet` to a `Zblob` object.
     pub fn to_zblob(&self) -> Zblob {
         Zblob::from_net(self)
+    }
+
+    /// Creates a new `PetriNet` object from the given diagram string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the diagram is invalid
+
+    pub fn from_diagram(contents: String) -> Self {
+        let mut net = PetriNet::new();
+        let mut x = 20;
+        let y = 200;
+        let grid = 80;
+
+        let lines: Vec<&str> = contents.split(';').map(str::trim).collect();
+        assert!(!lines.is_empty(), "Contents cannot be empty");
+
+        // Parse the first line to set the model type
+        let first_line = lines[0];
+        assert!(first_line.starts_with("ModelType::"), "First line must specify the model type in the format ModelType::[type]");
+
+        let model_type = first_line.replace("ModelType::", "");
+        net.model_type = model_type;
+
+        for line in &lines[1..] {
+            if line.is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = line.split("-->").map(str::trim).collect();
+            if parts.len() != 2 {
+                continue;
+            }
+            let first_param_is_state = parts[0].chars().next().expect("first char").is_uppercase();
+            let second_param_is_state = parts[1].chars().next().expect("first char").is_uppercase();
+
+            let state = if first_param_is_state {
+                parts[0]
+            } else {
+                assert!(second_param_is_state, "Second param must be uppercased state");
+                parts[1]
+            };
+
+            let action = if first_param_is_state {
+                parts[1]
+            } else {
+                assert!(second_param_is_state, "Second param must be uppercase state");
+                parts[0]
+            };
+
+            if !net.places.contains_key(state) {
+                x += grid;
+                let place_index: i32 = net.places.len().try_into().expect("place index overflow");
+                net.add_place(state, place_index, None, None, x, y);
+            }
+
+            if !net.transitions.contains_key(action) {
+                x += grid;
+                net.add_transition(action, "default", x, y);
+            }
+
+            net.add_arc(ArcParams {
+                source: if first_param_is_state {
+                    state
+                } else {
+                    action
+                },
+                target: if first_param_is_state {
+                    action
+                } else {
+                    state
+                },
+                weight: Some(1),
+                consume: Some(first_param_is_state),
+                produce: Some(second_param_is_state),
+                inhibit: None, // FIXME: not currently supported
+                read: None, // FIXME not currently supported
+            });
+        }
+
+        net
     }
 }
 
@@ -195,13 +275,88 @@ impl PetriNet {
 
 #[cfg(test)]
 mod tests {
-    use crate::fixtures::DINING_PHILOSOPHERS;
-
     use super::*;
+
+    pub const DINING_PHILOSOPHERS: &str = r#"
+    {
+        "modelType": "petriNet",
+        "version": "v0",
+        "places": {
+            "right2": { "offset": 0, "x": 810, "y": 149 },
+            "left2": { "offset": 1, "x": 942, "y": 153 },
+            "right3": { "offset": 2, "x": 1182, "y": 218 },
+            "left3": { "offset": 3, "x": 1260, "y": 339 },
+            "right4": { "offset": 4, "x": 1169, "y": 744 },
+            "left4": { "offset": 5, "x": 1082, "y": 843 },
+            "right5": { "offset": 6, "x": 630, "y": 856 },
+            "left5": { "offset": 7, "x": 531, "y": 728 },
+            "right1": { "offset": 8, "x": 441, "y": 359 },
+            "left1": { "offset": 9, "x": 501, "y": 244 },
+            "chopstick1": { "offset": 10, "initial": 1, "x": 811, "y": 426 },
+            "chopstick2": { "offset": 11, "initial": 1, "x": 931, "y": 434 },
+            "chopstick3": { "offset": 12, "initial": 1, "x": 969, "y": 545 },
+            "chopstick4": { "offset": 13, "initial": 1, "x": 863, "y": 614 },
+            "chopstick5": { "offset": 14, "initial": 1, "x": 774, "y": 536 }
+        },
+        "transitions": {
+            "eat1": { "x": 610, "y": 370 },
+            "think1": { "x": 372, "y": 247 },
+            "eat2": { "x": 874, "y": 281 },
+            "think2": { "x": 876, "y": 42 },
+            "eat3": { "x": 1115, "y": 348 },
+            "think3": { "x": 1309, "y": 215 },
+            "eat4": { "x": 1034, "y": 691 },
+            "think4": { "x": 1227, "y": 896 },
+            "eat5": { "x": 673, "y": 688 },
+            "think5": { "x": 483, "y": 887 }
+        },
+        "arcs": [
+            { "source": "chopstick1", "target": "eat1" },
+            { "source": "chopstick5", "target": "eat1" },
+            { "source": "eat1", "target": "left1" },
+            { "source": "eat1", "target": "right1" },
+            { "source": "eat2", "target": "right2" },
+            { "source": "eat2", "target": "left2" },
+            { "source": "chopstick1", "target": "eat2" },
+            { "source": "chopstick2", "target": "eat2" },
+            { "source": "chopstick2", "target": "eat3" },
+            { "source": "chopstick3", "target": "eat3" },
+            { "source": "eat3", "target": "right3" },
+            { "source": "eat3", "target": "left3" },
+            { "source": "chopstick3", "target": "eat4" },
+            { "source": "chopstick4", "target": "eat4" },
+            { "source": "eat4", "target": "left4" },
+            { "source": "eat4", "target": "right4" },
+            { "source": "think4", "target": "chopstick4" },
+            { "source": "think4", "target": "chopstick3" },
+            { "source": "right4", "target": "think4" },
+            { "source": "left4", "target": "think4" },
+            { "source": "chopstick5", "target": "eat5" },
+            { "source": "chopstick4", "target": "eat5" },
+            { "source": "eat5", "target": "left5" },
+            { "source": "eat5", "target": "right5" },
+            { "source": "think5", "target": "chopstick5" },
+            { "source": "think5", "target": "chopstick4" },
+            { "source": "left5", "target": "think5" },
+            { "source": "right5", "target": "think5" },
+            { "source": "left1", "target": "think1" },
+            { "source": "right1", "target": "think1" },
+            { "source": "think2", "target": "chopstick1" },
+            { "source": "think2", "target": "chopstick2" },
+            { "source": "think1", "target": "chopstick1" },
+            { "source": "think1", "target": "chopstick5" },
+            { "source": "right3", "target": "think3" },
+            { "source": "left3", "target": "think3" },
+            { "source": "think3", "target": "chopstick2" },
+            { "source": "think3", "target": "chopstick3" },
+            { "source": "right2", "target": "think2" },
+            { "source": "left2", "target": "think2" }
+        ]
+    }"#;
 
     #[test]
     fn test_importing_json() {
-        let petri_net = PetriNet::from_json_str(DINING_PHILOSOPHERS.to_string())
+        let petri_net = PetriNet::from_json_str(DINING_PHILOSOPHERS)
             .expect("Failed to create PetriNet");
         assert_eq!(petri_net.places.len(), 15);
         assert_eq!(petri_net.transitions.len(), 10);
@@ -210,15 +365,15 @@ mod tests {
 
     #[test]
     fn test_exporting_json() {
-        let petri_net = PetriNet::from_json_str(DINING_PHILOSOPHERS.to_string()).expect("Failed to create PetriNet");
+        let petri_net = PetriNet::from_json_str(DINING_PHILOSOPHERS).expect("Failed to create PetriNet");
         let json = petri_net.to_json_str().expect("Failed to convert PetriNet to JSON");
-        let net = PetriNet::from_json_str(json).expect("Failed to create PetriNet from JSON");
+        let net = PetriNet::from_json_str(&json).expect("Failed to create PetriNet from JSON");
         assert_eq!(net.places.len(), 15);
     }
 
     #[test]
     fn test_zblob() {
-        let petri_net = PetriNet::from_json_str(DINING_PHILOSOPHERS.to_string()).expect("Failed to create PetriNet");
+        let petri_net = PetriNet::from_json_str(DINING_PHILOSOPHERS).expect("Failed to create PetriNet");
         let zblob = petri_net.to_zblob();
         let net = zblob.to_net();
         assert_eq!(net.places.len(), 15);
@@ -226,5 +381,25 @@ mod tests {
             zblob.ipfs_cid,
             "zb2rhbJgSpkiifamgPLnyfEDxRKRBjPru2ojyYSBMitPNjXTx"
         );
+    }
+
+    #[test]
+    fn test_arrow_diagram() {
+        let contents = r"ModelType::PetriNet;
+            Water --> boil_water;
+            CoffeeBeans --> grind_beans;
+            BoiledWater --> brew_coffee;
+            GroundCoffee --> brew_coffee;
+            Filter --> brew_coffee;
+            CoffeeInPot --> pour_coffee;
+            Cup --> pour_coffee;
+        ";
+
+        let net = PetriNet::from_diagram(contents.to_string());
+        let zblob = net.to_zblob();
+        println!("https://pflow.dev/?z={}", zblob.base64_zipped);
+        let json_out = net.to_json().expect("Failed to convert to JSON");
+        let pretty_json = serde_json::to_string_pretty(&json_out).expect("failed to convert to pretty json");
+        print!("{pretty_json}");
     }
 }

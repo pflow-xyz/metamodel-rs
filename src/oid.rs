@@ -43,27 +43,3 @@ impl Oid {
         self.cid.to_bytes()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::fixtures::DINING_PHILOSOPHERS;
-
-    use super::*;
-
-    #[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
-    struct TestStruct {
-        field1: u32,
-        field2: String,
-    }
-
-    #[test]
-    fn test_cid_generation() {
-        let oid = Oid::new(DINING_PHILOSOPHERS.as_bytes()).expect("Failed to create Oid");
-        let oid_string = oid.to_string();
-        println!("oid_string: {oid_string}");
-        assert_eq!(
-            oid_string,
-            "zb2rhhAP4oqMEYFwLJ1UKgQrvBWsDkrvkY9Sn4HBVgfZ5ymNY"
-        );
-    }
-}

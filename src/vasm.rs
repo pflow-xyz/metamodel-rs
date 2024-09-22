@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +25,17 @@ pub enum ModelType {
     PetriNet,
     Elementary,
     Workflow,
+}
+
+impl fmt::Display for ModelType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            ModelType::PetriNet => "petriNet",
+            ModelType::Elementary => "elementary",
+            ModelType::Workflow => "workflow",
+        };
+        write!(f, "{s}")
+    }
 }
 
 /// Guard is a struct that represents a guard in a state machine.
@@ -62,10 +74,13 @@ pub struct StateMachine {
 }
 
 fn model_type_from_string(model_type: &str) -> ModelType {
-    match model_type {
+    match model_type.to_lowercase().as_str() {
         "elementary" => ModelType::Elementary,
         "workflow" => ModelType::Workflow,
-        _ => ModelType::PetriNet,
+        "petrinet" => ModelType::PetriNet,
+        _ => {
+            panic!("unknown model type: {model_type}");
+        }
     }
 }
 
@@ -147,8 +162,7 @@ impl StateMachine {
             } else {
                 model.places.get(&source)
             }
-                .expect("place not found");
-
+                .unwrap_or_else(|| panic!("place not found source:{source} target:{target}"));
             let t = if read || produce {
                 transitions.get_mut(&source)
             } else {
@@ -275,7 +289,7 @@ impl StateMachine {
         multiple: i32,
     ) -> Transaction {
         let role = transition.role.clone();
-        let (output, ok, overflow, underflow) =
+        let (output, _, overflow, underflow) =
             vector_add(&self.capacity, state, &transition.delta, multiple);
         let inhibited = self.guard_fails(state, transition, multiple);
         let workflow_output = output
@@ -298,11 +312,10 @@ impl StateMachine {
                 underflow,
             };
         }
-        let workflow_ok = ok && output_state_count == 1 && !inhibited;
 
         Transaction {
-            output,
-            ok: workflow_ok,
+            output: workflow_output,
+            ok: output_state_count == 1 && !inhibited,
             role,
             inhibited,
             overflow,

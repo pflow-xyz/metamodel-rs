@@ -166,7 +166,7 @@ mod tests {
         fn to_link(&self) -> String {
             format!(
                 "{}{}",
-                "http://example.com/?z=",
+                "http://pflow.dev/?z=",
                 self.model.net.to_zblob().base64_zipped.replace(' ', "+")
             )
         }
