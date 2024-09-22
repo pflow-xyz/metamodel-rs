@@ -35,7 +35,12 @@ impl Model {
     ///
     /// Panics if the diagram is not valid
     pub fn from_diagram(contents: String) -> Self {
-        let mut net = PetriNet::from_diagram(contents);
+        let mut net = if contents.contains("ModelType::") {
+            PetriNet::from_diagram(contents)
+        } else {
+            PetriNet::from_state_diagram(contents)
+        };
+        println!("https://pflow.dev/?z={}", net.to_zblob().base64_zipped);
         let vm = Box::new(net.declare(|_| {}).as_vasm());
         Self {
             net,

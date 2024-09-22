@@ -386,17 +386,33 @@ macro_rules! pflow_json {
 ///
 /// ```rust
 /// use pflow_metamodel::*;
-/// use std::sync::{Arc, Mutex};
 ///
+/// // NOTICE: use uppercase for states vs lowercase for transitions
 /// let model = pflow_diagram!{ ModelType::Workflow;
 ///     Water --> boil_water;
+///     boil_water --> BoiledWater;
 ///     CoffeeBeans --> grind_beans;
+///     grind_beans --> GroundCoffee;
 ///     BoiledWater --> brew_coffee;
 ///     GroundCoffee --> brew_coffee;
 ///     Filter --> brew_coffee;
+///     brew_coffee --> CoffeeInPot;
 ///     CoffeeInPot --> pour_coffee;
 ///     Cup --> pour_coffee;
 /// };
+/// println!("https://pflow.dev?z={}", model.net.to_zblob().base64_zipped);
+///
+/// // NOTICE: only specify states in a diagram not providing a ModelType::
+/// let state_model = pflow_diagram! {
+///     Crash --> [*];
+///     Moving --> Crash;
+///     Moving --> Still;
+///     Still --> Moving;
+///     Still --> [*];
+///     [*] --> Still;
+/// };
+///
+/// println!("https://pflow.dev?z={}", state_model.net.to_zblob().base64_zipped);
 /// ```
 #[macro_export]
 macro_rules! pflow_diagram {
@@ -413,13 +429,16 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     #[test]
-    fn test_coffee_machine() {
-        let coffee_machine = pflow_diagram! { ModelType::PetriNet;
+    fn test_pflow_diagram() {
+        let coffee_machine = pflow_diagram! { ModelType::Workflow;
             Water --> boil_water;
+            boil_water --> BoiledWater;
             CoffeeBeans --> grind_beans;
+            grind_beans --> GroundCoffee;
             BoiledWater --> brew_coffee;
             GroundCoffee --> brew_coffee;
             Filter --> brew_coffee;
+            brew_coffee --> CoffeeInPot;
             CoffeeInPot --> pour_coffee;
             Cup --> pour_coffee;
         };
