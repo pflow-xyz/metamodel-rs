@@ -40,7 +40,7 @@ impl Model {
         } else {
             PetriNet::from_state_diagram(contents)
         };
-        println!("https://pflow.dev/?z={}", net.to_zblob().base64_zipped);
+        // println!("https://pflow.dev/?z={}", net.to_zblob().base64_zipped);
         let vm = Box::new(net.declare(|_| {}).as_vasm());
         Self {
             net,

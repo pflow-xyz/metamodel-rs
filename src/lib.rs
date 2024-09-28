@@ -3,38 +3,6 @@
 //! See the code below for an example of how to create a Petri-net model using the `pflow_metamodel` library.
 //!
 //! Also see: [Macro pflow_metamodel::pflow_dsl](macro.pflow_dsl.html) for creating models using an internal rust DSL rather than json.
-//! ```
-//! use pflow_metamodel::*;
-//!
-//! let model: Model = pflow_json!{{
-//!    "modelType": "petriNet",
-//!    "version": "v0",
-//!    "places": {
-//!      "place0": { "offset": 0, "capacity": 3, "x": 100, "y": 180 }
-//!    },
-//!    "transitions": {
-//!      "txn0": { "role": "role0", "x": 20, "y": 100 },
-//!      "txn1": { "role": "role0", "x": 180, "y": 100 },
-//!      "txn2": { "role": "role0", "x": 20, "y": 260 },
-//!      "txn3": { "role": "role0", "x": 180, "y": 260 }
-//!    },
-//!    "arcs": [
-//!      { "source": "txn0", "target": "place0" },
-//!      { "source": "place0", "target": "txn1", "weight": 3 },
-//!      { "source": "txn2", "target": "place0", "weight": 3, "inhibit": true },
-//!      { "source": "place0", "target": "txn3", "inhibit": true }
-//!    ]
-//! }};
-//!
-//! let state = model.vm.initial_vector();
-//! assert_eq!(state, vec![0]);
-//! let res = model.vm.transform(&state, "txn0", 1);
-//! assert!(res.ok);
-//! assert_eq!(state, vec![0]); // input state is _not_ mutated
-//! assert_eq!(res.output, vec![1]);
-//! let t = model.net.transitions.get("txn0");
-//! assert!(t.is_some());
-//! ```
 //!
 //! - Provides a DSL-driven framework for modeling and simulating Petri-nets, wf-nets, and DFAs.
 //! - State machine data types are executed as a [Vector Addition State Machine (VASM)](https://en.wikipedia.org/wiki/Vector_addition_system).
@@ -52,85 +20,6 @@
 //!
 //! - read more about the [dining philosophers problem](https://pflow.dev/examples-dining-philosophers).
 //! - interact with the model [dining philosophers model](https://pflow.dev/p/zb2rhimQLDKMY6yBXMLV2DJyCPqseb9kTJKdjiwKgzQEgwGvt/)
-//! ```rust
-//! use pflow_metamodel::*;
-//!
-//! let model = pflow_json!{{
-//! "modelType": "petriNet",
-//! "version": "v0",
-//! "places": {
-//!   "chopstick0": { "offset": 0, "initial": 1, "x": 403, "y": 340 },
-//!   "chopstick1": { "offset": 1, "initial": 1, "x": 534, "y": 345 },
-//!   "chopstick2": { "offset": 2, "initial": 1, "x": 358, "y": 467 },
-//!   "chopstick3": { "offset": 3, "initial": 1, "x": 547, "y": 461 },
-//!   "chopstick4": { "offset": 4, "initial": 1, "x": 451, "y": 536 },
-//!   "0right": { "offset": 5, "x": 415, "y": 181 },
-//!   "0left": { "offset": 6, "x": 545, "y": 177 },
-//!   "1right": { "offset": 7, "x": 719, "y": 288 },
-//!   "1left": { "offset": 8, "x": 769, "y": 404 },
-//!   "2left": { "offset": 9, "x": 686, "y": 584 },
-//!   "2right": { "offset": 10, "x": 594, "y": 678 },
-//!   "3left": { "offset": 11, "x": 315, "y": 679 },
-//!   "3right": { "offset": 12, "x": 216, "y": 608 },
-//!   "4right": { "offset": 13, "x": 148, "y": 397 },
-//!   "4left": { "offset": 14, "x": 183, "y": 289 }
-//! },
-//! "transitions": {
-//!   "0think": { "x": 478, "y": 106 },
-//!   "0eat": { "x": 473, "y": 247 },
-//!   "1eat": { "x": 654, "y": 396 },
-//!   "2eat": { "x": 574, "y": 573 },
-//!   "3eat": { "x": 333, "y": 556 },
-//!   "4eat": { "x": 267, "y": 370 },
-//!   "1think": { "x": 842, "y": 304 },
-//!   "4think": { "x": 72, "y": 314 },
-//!   "3think": { "x": 200, "y": 726 },
-//!   "2think": { "x": 740, "y": 699 }
-//! },
-//! "arcs": [
-//!   { "source": "chopstick0", "target": "0eat" },
-//!   { "source": "chopstick1", "target": "0eat" },
-//!   { "source": "chopstick0", "target": "4eat" },
-//!   { "source": "chopstick2", "target": "4eat" },
-//!   { "source": "chopstick1", "target": "1eat" },
-//!   { "source": "chopstick3", "target": "1eat" },
-//!   { "source": "chopstick2", "target": "3eat" },
-//!   { "source": "chopstick4", "target": "3eat" },
-//!   { "source": "chopstick4", "target": "2eat" },
-//!   { "source": "chopstick3", "target": "2eat" },
-//!   { "source": "0eat", "target": "0right" },
-//!   { "source": "0eat", "target": "0left" },
-//!   { "source": "1eat", "target": "1right" },
-//!   { "source": "1eat", "target": "1left" },
-//!   { "source": "2eat", "target": "2left" },
-//!   { "source": "2eat", "target": "2right" },
-//!   { "source": "3eat", "target": "3right" },
-//!   { "source": "3eat", "target": "3left" },
-//!   { "source": "4eat", "target": "4right" },
-//!   { "source": "4eat", "target": "4left" },
-//!   { "source": "0right", "target": "0think" },
-//!   { "source": "0left", "target": "0think" },
-//!   { "source": "1right", "target": "1think" },
-//!   { "source": "1left", "target": "1think" },
-//!   { "source": "2left", "target": "2think" },
-//!   { "source": "2right", "target": "2think" },
-//!   { "source": "4left", "target": "4think" },
-//!   { "source": "4right", "target": "4think" },
-//!   { "source": "3right", "target": "3think" },
-//!   { "source": "3left", "target": "3think" },
-//!   { "source": "4think", "target": "chopstick0" },
-//!   { "source": "4think", "target": "chopstick2" },
-//!   { "source": "0think", "target": "chopstick0" },
-//!   { "source": "0think", "target": "chopstick1" },
-//!   { "source": "1think", "target": "chopstick1" },
-//!   { "source": "1think", "target": "chopstick3" },
-//!   { "source": "2think", "target": "chopstick3" },
-//!   { "source": "2think", "target": "chopstick4" },
-//!   { "source": "3think", "target": "chopstick2" },
-//!   { "source": "3think", "target": "chopstick4" }
-//! ]
-//! }};
-//! ```
 //!
 //! ![dining_philosophers][dining_philosophers]
 //!
@@ -207,44 +96,12 @@ pub mod zblob;
 /// The `model` encapsulates the `PetriNet` and `Vasm` objects into a single `Model` object.
 pub mod model;
 
+mod display;
+
 pub use crate::model::*;
 pub use crate::vasm::*;
 
-
-/// Create a model using the pflow DSL
-/// This is the primary way to create a model for most use cases
-///
-/// ![pflow][pflow]
-///
-/// [pflow]: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiB2aWV3Qm94PSItMzggNDIgMjgwIDI4MCI+CjxkZWZzPjxtYXJrZXIgaWQ9Im1hcmtlckFycm93MSIgbWFya2VyV2lkdGg9IjIzIiBtYXJrZXJIZWlnaHQ9IjEzIiByZWZYPSIzMSIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIj48cmVjdCB3aWR0aD0iMjgiIGhlaWdodD0iMyIgZmlsbD0id2hpdGUiIHN0cm9rZT0id2hpdGUiIHg9IjMiIHk9IjUiLz48cGF0aCBkPSJNMiwyIEwyLDExIEwxMCw2IEwyLDIiLz48L21hcmtlcj48bWFya2VyIGlkPSJtYXJrZXJJbmhpYml0MSIgbWFya2VyV2lkdGg9IjIzIiBtYXJrZXJIZWlnaHQ9IjEzIiByZWZYPSIzMSIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIj48cmVjdCB3aWR0aD0iMjgiIGhlaWdodD0iMyIgZmlsbD0id2hpdGUiIHN0cm9rZT0id2hpdGUiIHg9IjMiIHk9IjUiLz48Y2lyY2xlIGN4PSI1IiBjeT0iNi41IiByPSI0Ii8+PC9tYXJrZXI+PC9kZWZzPgo8Zz4KPGxpbmUgeDE9IjIyIiB5MT0iMTAyIiB4Mj0iOTkiIHkyPSIxODMiIHN0cm9rZT0iIzAwMDAwMCIgbWFya2VyLWVuZD0idXJsKCNtYXJrZXJBcnJvdzEpIiAvPgo8dGV4dCB4PSI1NiIgeT0iMTM4IiBmb250LXNpemU9InNtYWxsIj4xPC90ZXh0Pgo8L2c+CjxnPgo8bGluZSB4MT0iOTkiIHkxPSIxODMiIHgyPSIxODIiIHkyPSIxMDIiIHN0cm9rZT0iIzAwMDAwMCIgbWFya2VyLWVuZD0idXJsKCNtYXJrZXJBcnJvdzEpIiAvPgo8dGV4dCB4PSIxMzYiIHk9IjEzOCIgZm9udC1zaXplPSJzbWFsbCI+MzwvdGV4dD4KPC9nPgo8Zz4KPGxpbmUgeDE9IjIyIiB5MT0iMjYyIiB4Mj0iOTkiIHkyPSIxODMiIHN0cm9rZT0iIzAwMDAwMCIgbWFya2VyLWVuZD0idXJsKCNtYXJrZXJJbmhpYml0MSkiIC8+Cjx0ZXh0IHg9IjU2IiB5PSIyMTgiIGZvbnQtc2l6ZT0ic21hbGwiPjM8L3RleHQ+CjwvZz4KPGc+CjxsaW5lIHgxPSI5OSIgeTE9IjE4MyIgeDI9IjE4MiIgeTI9IjI2MiIgc3Ryb2tlPSIjMDAwMDAwIiBtYXJrZXItZW5kPSJ1cmwoI21hcmtlckluaGliaXQxKSIgLz4KPHRleHQgeD0iMTM2IiB5PSIyMTgiIGZvbnQtc2l6ZT0ic21hbGwiPjE8L3RleHQ+CjwvZz4KPGc+CjxjaXJjbGUgY3g9Ijk5IiBjeT0iMTgzIiByPSIxNiIgc3Ryb2tlV2lkdGg9IjEuNSIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjMDAwMDAwIiBvcmllbnQ9IjAiIHNoYXBlUmVuZGVyaW5nPSJhdXRvIiAvPjx0ZXh0IHg9IjgxIiB5PSIxNjMiIGZvbnQtc2l6ZT0ic21hbGwiPnBsYWNlMDwvdGV4dD4KPC9nPgo8Zz4KPHJlY3QgeD0iMTY1IiB5PSI4NSIgd2lkdGg9IjMwIiBoZWlnaHQ9IjMwIiBzdHJva2U9IiMwMDAwMDAiIGZpbGw9IiNmZmZmZmYiIHJ4PSI0IiAvPjx0ZXh0IHg9IjE2NSIgeT0iNzciIGZvbnQtc2l6ZT0ic21hbGwiPnR4bjE8L3RleHQ+CjwvZz4KPGc+CjxyZWN0IHg9IjUiIHk9IjI0NSIgd2lkdGg9IjMwIiBoZWlnaHQ9IjMwIiBzdHJva2U9IiMwMDAwMDAiIGZpbGw9IiNmYWI1YjAiIHJ4PSI0IiAvPjx0ZXh0IHg9IjUiIHk9IjIzNyIgZm9udC1zaXplPSJzbWFsbCI+dHhuMjwvdGV4dD4KPC9nPgo8Zz4KPHJlY3QgeD0iMTY1IiB5PSIyNDUiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgc3Ryb2tlPSIjMDAwMDAwIiBmaWxsPSIjNjJmYTc1IiByeD0iNCIgLz48dGV4dCB4PSIxNjUiIHk9IjIzNyIgZm9udC1zaXplPSJzbWFsbCI+dHhuMzwvdGV4dD4KPC9nPgo8Zz4KPHJlY3QgeD0iNSIgeT0iODUiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgc3Ryb2tlPSIjMDAwMDAwIiBmaWxsPSIjNjJmYTc1IiByeD0iNCIgLz48dGV4dCB4PSI1IiB5PSI3NyIgZm9udC1zaXplPSJzbWFsbCI+dHhuMDwvdGV4dD4KPC9nPgo8L3N2Zz4=
-/// # Example
-///
-/// ```
-/// use pflow_metamodel::*;
-///
-/// let model: Model = pflow_dsl!{
-///    declare "petriNet"
-///    cell "place0", 0, 3, [100, 180]
-///    func "txn0", "default", [20, 100]
-///    func "txn1", "default", [180, 100]
-///    func "txn2", "default", [20, 260]
-///    func "txn3", "default", [180, 260]
-///    arrow "txn0", "place0", 1
-///    arrow "place0", "txn1", 3
-///    guard "txn2", "place0", 3
-///    guard "place0", "txn3", 1
-/// };
-///
-/// let state = model.vm.initial_vector();
-/// assert_eq!(state, vec![0]);
-/// let res = model.vm.transform(&state, "txn0", 1);
-/// assert!(res.ok);
-/// assert_eq!(state, vec![0]); // input state is _not_ mutated
-/// assert_eq!(res.output, vec![1]);
-/// let t = model.net.transitions.get("txn0");
-/// assert!(t.is_some());
-/// ```
-#[macro_export]
+#[allow(unused)]
 macro_rules! pflow_dsl {
     ($($name:ident $($args:expr),*)*) => {{
         declaration_function! {
@@ -277,43 +134,7 @@ macro_rules! pflow_dsl {
     }};
 }
 
-/// Create a model using the internal DSL functions without macro rewriting
-/// Generally not used directly, but may be useful for deeper integration with other libraries
-///
-/// ![pflow][pflow]
-///
-/// [pflow]: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiB2aWV3Qm94PSItMzggNDIgMjgwIDI4MCI+CjxkZWZzPjxtYXJrZXIgaWQ9Im1hcmtlckFycm93MSIgbWFya2VyV2lkdGg9IjIzIiBtYXJrZXJIZWlnaHQ9IjEzIiByZWZYPSIzMSIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIj48cmVjdCB3aWR0aD0iMjgiIGhlaWdodD0iMyIgZmlsbD0id2hpdGUiIHN0cm9rZT0id2hpdGUiIHg9IjMiIHk9IjUiLz48cGF0aCBkPSJNMiwyIEwyLDExIEwxMCw2IEwyLDIiLz48L21hcmtlcj48bWFya2VyIGlkPSJtYXJrZXJJbmhpYml0MSIgbWFya2VyV2lkdGg9IjIzIiBtYXJrZXJIZWlnaHQ9IjEzIiByZWZYPSIzMSIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIj48cmVjdCB3aWR0aD0iMjgiIGhlaWdodD0iMyIgZmlsbD0id2hpdGUiIHN0cm9rZT0id2hpdGUiIHg9IjMiIHk9IjUiLz48Y2lyY2xlIGN4PSI1IiBjeT0iNi41IiByPSI0Ii8+PC9tYXJrZXI+PC9kZWZzPgo8Zz4KPGxpbmUgeDE9IjIyIiB5MT0iMTAyIiB4Mj0iOTkiIHkyPSIxODMiIHN0cm9rZT0iIzAwMDAwMCIgbWFya2VyLWVuZD0idXJsKCNtYXJrZXJBcnJvdzEpIiAvPgo8dGV4dCB4PSI1NiIgeT0iMTM4IiBmb250LXNpemU9InNtYWxsIj4xPC90ZXh0Pgo8L2c+CjxnPgo8bGluZSB4MT0iOTkiIHkxPSIxODMiIHgyPSIxODIiIHkyPSIxMDIiIHN0cm9rZT0iIzAwMDAwMCIgbWFya2VyLWVuZD0idXJsKCNtYXJrZXJBcnJvdzEpIiAvPgo8dGV4dCB4PSIxMzYiIHk9IjEzOCIgZm9udC1zaXplPSJzbWFsbCI+MzwvdGV4dD4KPC9nPgo8Zz4KPGxpbmUgeDE9IjIyIiB5MT0iMjYyIiB4Mj0iOTkiIHkyPSIxODMiIHN0cm9rZT0iIzAwMDAwMCIgbWFya2VyLWVuZD0idXJsKCNtYXJrZXJJbmhpYml0MSkiIC8+Cjx0ZXh0IHg9IjU2IiB5PSIyMTgiIGZvbnQtc2l6ZT0ic21hbGwiPjM8L3RleHQ+CjwvZz4KPGc+CjxsaW5lIHgxPSI5OSIgeTE9IjE4MyIgeDI9IjE4MiIgeTI9IjI2MiIgc3Ryb2tlPSIjMDAwMDAwIiBtYXJrZXItZW5kPSJ1cmwoI21hcmtlckluaGliaXQxKSIgLz4KPHRleHQgeD0iMTM2IiB5PSIyMTgiIGZvbnQtc2l6ZT0ic21hbGwiPjE8L3RleHQ+CjwvZz4KPGc+CjxjaXJjbGUgY3g9Ijk5IiBjeT0iMTgzIiByPSIxNiIgc3Ryb2tlV2lkdGg9IjEuNSIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjMDAwMDAwIiBvcmllbnQ9IjAiIHNoYXBlUmVuZGVyaW5nPSJhdXRvIiAvPjx0ZXh0IHg9IjgxIiB5PSIxNjMiIGZvbnQtc2l6ZT0ic21hbGwiPnBsYWNlMDwvdGV4dD4KPC9nPgo8Zz4KPHJlY3QgeD0iMTY1IiB5PSI4NSIgd2lkdGg9IjMwIiBoZWlnaHQ9IjMwIiBzdHJva2U9IiMwMDAwMDAiIGZpbGw9IiNmZmZmZmYiIHJ4PSI0IiAvPjx0ZXh0IHg9IjE2NSIgeT0iNzciIGZvbnQtc2l6ZT0ic21hbGwiPnR4bjE8L3RleHQ+CjwvZz4KPGc+CjxyZWN0IHg9IjUiIHk9IjI0NSIgd2lkdGg9IjMwIiBoZWlnaHQ9IjMwIiBzdHJva2U9IiMwMDAwMDAiIGZpbGw9IiNmYWI1YjAiIHJ4PSI0IiAvPjx0ZXh0IHg9IjUiIHk9IjIzNyIgZm9udC1zaXplPSJzbWFsbCI+dHhuMjwvdGV4dD4KPC9nPgo8Zz4KPHJlY3QgeD0iMTY1IiB5PSIyNDUiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgc3Ryb2tlPSIjMDAwMDAwIiBmaWxsPSIjNjJmYTc1IiByeD0iNCIgLz48dGV4dCB4PSIxNjUiIHk9IjIzNyIgZm9udC1zaXplPSJzbWFsbCI+dHhuMzwvdGV4dD4KPC9nPgo8Zz4KPHJlY3QgeD0iNSIgeT0iODUiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgc3Ryb2tlPSIjMDAwMDAwIiBmaWxsPSIjNjJmYTc1IiByeD0iNCIgLz48dGV4dCB4PSI1IiB5PSI3NyIgZm9udC1zaXplPSJzbWFsbCI+dHhuMDwvdGV4dD4KPC9nPgo8L3N2Zz4=
-///
-/// # Example
-///
-/// ```
-/// use pflow_metamodel::*;
-///
-/// let model = declaration_function! {
-///    |p: &mut dyn dsl::Dsl| {
-///       p.model_type("petriNet");
-///       p.cell("place0", Option::from(0), Option::from(3), 100, 180);
-///       p.func("txn0", "default", 20, 100);
-///       p.func("txn1", "default", 180, 100);
-///       p.func("txn2", "default", 20, 260);
-///       p.func("txn3", "default", 180, 260);
-///       p.arrow("txn0", "place0", 1);
-///       p.arrow("place0", "txn1", 3);
-///       p.guard("txn2", "place0", 3);
-///       p.guard("place0", "txn3", 1);
-///     }
-/// };
-///
-/// let state = model.vm.initial_vector();
-/// assert_eq!(state, vec![0]);
-/// let res = model.vm.transform(&state, "txn0", 1);
-/// assert!(res.ok);
-/// assert_eq!(state, vec![0]); // input state is _not_ mutated
-/// assert_eq!(res.output, vec![1]);
-/// let t = model.net.transitions.get("txn0");
-/// assert!(t.is_some());
-/// ```
-#[macro_export]
+#[allow(unused)]
 macro_rules! declaration_function {
     ($($flow_dsl:tt)*) => {{
         let model = model::Model::new(
@@ -323,48 +144,7 @@ macro_rules! declaration_function {
     }};
 }
 
-/// Create a model from a JSON string compatible with pflow.xyz
-///
-/// ![pflow][pflow]
-///
-/// [pflow]: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyODAiIGhlaWdodD0iMjgwIiB2aWV3Qm94PSItMzggNDIgMjgwIDI4MCI+CjxkZWZzPjxtYXJrZXIgaWQ9Im1hcmtlckFycm93MSIgbWFya2VyV2lkdGg9IjIzIiBtYXJrZXJIZWlnaHQ9IjEzIiByZWZYPSIzMSIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIj48cmVjdCB3aWR0aD0iMjgiIGhlaWdodD0iMyIgZmlsbD0id2hpdGUiIHN0cm9rZT0id2hpdGUiIHg9IjMiIHk9IjUiLz48cGF0aCBkPSJNMiwyIEwyLDExIEwxMCw2IEwyLDIiLz48L21hcmtlcj48bWFya2VyIGlkPSJtYXJrZXJJbmhpYml0MSIgbWFya2VyV2lkdGg9IjIzIiBtYXJrZXJIZWlnaHQ9IjEzIiByZWZYPSIzMSIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIj48cmVjdCB3aWR0aD0iMjgiIGhlaWdodD0iMyIgZmlsbD0id2hpdGUiIHN0cm9rZT0id2hpdGUiIHg9IjMiIHk9IjUiLz48Y2lyY2xlIGN4PSI1IiBjeT0iNi41IiByPSI0Ii8+PC9tYXJrZXI+PC9kZWZzPgo8Zz4KPGxpbmUgeDE9IjIyIiB5MT0iMTAyIiB4Mj0iOTkiIHkyPSIxODMiIHN0cm9rZT0iIzAwMDAwMCIgbWFya2VyLWVuZD0idXJsKCNtYXJrZXJBcnJvdzEpIiAvPgo8dGV4dCB4PSI1NiIgeT0iMTM4IiBmb250LXNpemU9InNtYWxsIj4xPC90ZXh0Pgo8L2c+CjxnPgo8bGluZSB4MT0iOTkiIHkxPSIxODMiIHgyPSIxODIiIHkyPSIxMDIiIHN0cm9rZT0iIzAwMDAwMCIgbWFya2VyLWVuZD0idXJsKCNtYXJrZXJBcnJvdzEpIiAvPgo8dGV4dCB4PSIxMzYiIHk9IjEzOCIgZm9udC1zaXplPSJzbWFsbCI+MzwvdGV4dD4KPC9nPgo8Zz4KPGxpbmUgeDE9IjIyIiB5MT0iMjYyIiB4Mj0iOTkiIHkyPSIxODMiIHN0cm9rZT0iIzAwMDAwMCIgbWFya2VyLWVuZD0idXJsKCNtYXJrZXJJbmhpYml0MSkiIC8+Cjx0ZXh0IHg9IjU2IiB5PSIyMTgiIGZvbnQtc2l6ZT0ic21hbGwiPjM8L3RleHQ+CjwvZz4KPGc+CjxsaW5lIHgxPSI5OSIgeTE9IjE4MyIgeDI9IjE4MiIgeTI9IjI2MiIgc3Ryb2tlPSIjMDAwMDAwIiBtYXJrZXItZW5kPSJ1cmwoI21hcmtlckluaGliaXQxKSIgLz4KPHRleHQgeD0iMTM2IiB5PSIyMTgiIGZvbnQtc2l6ZT0ic21hbGwiPjE8L3RleHQ+CjwvZz4KPGc+CjxjaXJjbGUgY3g9Ijk5IiBjeT0iMTgzIiByPSIxNiIgc3Ryb2tlV2lkdGg9IjEuNSIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjMDAwMDAwIiBvcmllbnQ9IjAiIHNoYXBlUmVuZGVyaW5nPSJhdXRvIiAvPjx0ZXh0IHg9IjgxIiB5PSIxNjMiIGZvbnQtc2l6ZT0ic21hbGwiPnBsYWNlMDwvdGV4dD4KPC9nPgo8Zz4KPHJlY3QgeD0iMTY1IiB5PSI4NSIgd2lkdGg9IjMwIiBoZWlnaHQ9IjMwIiBzdHJva2U9IiMwMDAwMDAiIGZpbGw9IiNmZmZmZmYiIHJ4PSI0IiAvPjx0ZXh0IHg9IjE2NSIgeT0iNzciIGZvbnQtc2l6ZT0ic21hbGwiPnR4bjE8L3RleHQ+CjwvZz4KPGc+CjxyZWN0IHg9IjUiIHk9IjI0NSIgd2lkdGg9IjMwIiBoZWlnaHQ9IjMwIiBzdHJva2U9IiMwMDAwMDAiIGZpbGw9IiNmYWI1YjAiIHJ4PSI0IiAvPjx0ZXh0IHg9IjUiIHk9IjIzNyIgZm9udC1zaXplPSJzbWFsbCI+dHhuMjwvdGV4dD4KPC9nPgo8Zz4KPHJlY3QgeD0iMTY1IiB5PSIyNDUiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgc3Ryb2tlPSIjMDAwMDAwIiBmaWxsPSIjNjJmYTc1IiByeD0iNCIgLz48dGV4dCB4PSIxNjUiIHk9IjIzNyIgZm9udC1zaXplPSJzbWFsbCI+dHhuMzwvdGV4dD4KPC9nPgo8Zz4KPHJlY3QgeD0iNSIgeT0iODUiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgc3Ryb2tlPSIjMDAwMDAwIiBmaWxsPSIjNjJmYTc1IiByeD0iNCIgLz48dGV4dCB4PSI1IiB5PSI3NyIgZm9udC1zaXplPSJzbWFsbCI+dHhuMDwvdGV4dD4KPC9nPgo8L3N2Zz4=
-///
-///
-/// # Example
-///
-/// ```
-/// use pflow_metamodel::*;
-///
-/// let model: Model = pflow_json!{{
-///    "modelType": "petriNet",
-///    "version": "v0",
-///    "places": {
-///      "place0": { "offset": 0, "capacity": 3, "x": 100, "y": 180 }
-///    },
-///    "transitions": {
-///      "txn0": { "role": "role0", "x": 20, "y": 100 },
-///      "txn1": { "role": "role0", "x": 180, "y": 100 },
-///      "txn2": { "role": "role0", "x": 20, "y": 260 },
-///      "txn3": { "role": "role0", "x": 180, "y": 260 }
-///    },
-///    "arcs": [
-///      { "source": "txn0", "target": "place0" },
-///      { "source": "place0", "target": "txn1", "weight": 3 },
-///      { "source": "txn2", "target": "place0", "weight": 3, "inhibit": true },
-///      { "source": "place0", "target": "txn3", "inhibit": true }
-///    ]
-/// }};
-///
-/// let state = model.vm.initial_vector();
-/// assert_eq!(state, vec![0]);
-/// let res = model.vm.transform(&state, "txn0", 1);
-/// assert!(res.ok);
-/// assert_eq!(state, vec![0]); // input state is _not_ mutated
-/// assert_eq!(res.output, vec![1]);
-/// let t = model.net.transitions.get("txn0");
-/// assert!(t.is_some());
-/// ```
-#[macro_export]
+#[allow(unused)]
 macro_rules! pflow_json {
     ($($flow_json:tt)*) => {{
         let mut net = petri_net::PetriNet::from_json_value(
@@ -380,41 +160,7 @@ macro_rules! pflow_json {
     }};
 }
 
-/// Create a model from a diagram string
-///
-/// Example:
-///
-/// ```rust
-/// use pflow_metamodel::*;
-///
-/// // NOTICE: use uppercase for states vs lowercase for transitions
-/// let model = pflow_diagram!{ ModelType::Workflow;
-///     Water --> boil_water;
-///     boil_water --> BoiledWater;
-///     CoffeeBeans --> grind_beans;
-///     grind_beans --> GroundCoffee;
-///     BoiledWater --> brew_coffee;
-///     GroundCoffee --> brew_coffee;
-///     Filter --> brew_coffee;
-///     brew_coffee --> CoffeeInPot;
-///     CoffeeInPot --> pour_coffee;
-///     Cup --> pour_coffee;
-/// };
-/// println!("https://pflow.dev?z={}", model.net.to_zblob().base64_zipped);
-///
-/// // NOTICE: only specify states in a diagram not providing a ModelType::
-/// let state_model = pflow_diagram! {
-///     Crash --> [*];
-///     Moving --> Crash;
-///     Moving --> Still;
-///     Still --> Moving;
-///     Still --> [*];
-///     [*] --> Still;
-/// };
-///
-/// println!("https://pflow.dev?z={}", state_model.net.to_zblob().base64_zipped);
-/// ```
-#[macro_export]
+#[allow(unused)]
 macro_rules! pflow_diagram {
     ($($workflow_declaration:tt)*) => {
         {
@@ -423,154 +169,365 @@ macro_rules! pflow_diagram {
     };
 }
 
+/// Create a model using state transition diagram notation
+#[macro_export]
+macro_rules! state_machine {
+    ($name:ident { $($diagram:tt)* }) => {
+        struct $name {
+            #[allow(unused)]
+            model: Model,
+            #[allow(unused)]
+            state: std::sync::Arc<std::sync::Mutex<Vector>>,
+        }
+
+        impl $name {
+            pub fn new() -> Self {
+                let model = pflow_diagram! {
+                    $($diagram)*
+                };
+
+                let state = model.vm.initial_vector();
+
+                $name {
+                    model,
+                    state: std::sync::Arc::new(std::sync::Mutex::new(state)),
+                }
+            }
+        }
+    };
+}
+
+/// Create a model using the json DSL
+#[macro_export]
+macro_rules! petri_net {
+    ($name:ident { $($json:tt)* }) => {
+        struct $name {
+            #[allow(unused)]
+            model: Model,
+            #[allow(unused)]
+            state: std::sync::Arc<std::sync::Mutex<Vector>>,
+        }
+
+        impl $name {
+            pub fn new() -> Self {
+                let model = pflow_json! {
+                    $($json)*
+                };
+
+                let state = model.vm.initial_vector();
+
+                $name {
+                    model,
+                    state: std::sync::Arc::new(std::sync::Mutex::new(state)),
+                }
+            }
+        }
+    };
+}
+
+/// Create a model using the internal DSL
+#[macro_export]
+macro_rules! pflow {
+    ($name:ident { $($body:tt)* }) => {
+        struct $name {
+            #[allow(unused)]
+            model: Model,
+            #[allow(unused)]
+            state: std::sync::Arc<std::sync::Mutex<Vector>>,
+        }
+
+        impl $name {
+            pub fn new() -> Self {
+                let model = pflow_dsl! {
+                    $($body)*
+                };
+
+                let state = model.vm.initial_vector();
+
+                $name {
+                    model,
+                    state: std::sync::Arc::new(std::sync::Mutex::new(state)),
+                }
+            }
+        }
+    };
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum StateMachineError {
+    InvalidAction,
+}
+
+#[derive(Debug)]
+pub struct Event<T> {
+    pub action: String,
+    pub seq: u64,
+    pub state: Vec<i32>,
+    pub data: T,
+}
+
+pub trait State {
+    /// Evaluate the preconditions to initialize the model state
+    fn evaluate_preconditions(&self) -> Result<bool, StateMachineError>;
+    /// An accessor function used to get the current state
+    fn evaluate_resource(&self, label: &str) -> Result<i32, StateMachineError>;
+}
+
+pub trait Process<TContext> {
+    /// Run the state machine until no actions are available
+    fn run(&self, input: TContext) -> Vec<Event<TContext>>;
+    /// Runs the main loop of the state machine
+    fn run_impl(&self, action: Option<&str>, seq: Option<u64>, event_log: Vec<Event<TContext>>) -> Vec<Event<TContext>>;
+    /// Process an action and return the resulting event
+    fn process_action(&self, action: &str, seq: u64) -> Option<Event<TContext>>;
+    /// Get the next action to be executed
+    fn next_action(&self) -> Vec<String>;
+    /// Execute an action and return the resulting event
+    fn execute_action(&self, event: Event<TContext>) -> Result<Event<TContext>, StateMachineError>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
+    use std::usize;
 
-    #[test]
-    fn test_pflow_diagram() {
-        let coffee_machine = pflow_diagram! { ModelType::Workflow;
-            Water --> boil_water;
-            boil_water --> BoiledWater;
-            CoffeeBeans --> grind_beans;
-            grind_beans --> GroundCoffee;
-            BoiledWater --> brew_coffee;
-            GroundCoffee --> brew_coffee;
-            Filter --> brew_coffee;
-            brew_coffee --> CoffeeInPot;
-            CoffeeInPot --> pour_coffee;
-            Cup --> pour_coffee;
-        };
-        let zblob = coffee_machine.net.to_zblob();
-        println!("https://pflow.dev?z={}", zblob.base64_zipped);
-    }
+    pflow! { CoffeeMachineUsingDsl {
+        declare "PetriNet"
+        cell "Water", 1, 1, [100, 200]
+        cell "BoiledWater", 0, 1, [260, 200]
+        cell "CoffeeBeans", 1, 1, [376, 434]
+        cell "GroundCoffee", 0, 1, [541, 469]
+        cell "Filter", 1, 1, [660, 200]
+        cell "CoffeeInPot", 0, 1, [740, 200]
+        cell "Cup", 1, 1, [900, 200]
+        func "boil_water", "default", [191, 489]
+        func "brew_coffee", "default", [548, 118]
+        func "grind_beans", "default", [420, 200]
+        func "pour_coffee", "default", [820, 200]
+        arrow "Water", "boil_water", 1
+        arrow "boil_water", "BoiledWater", 1
+        arrow "CoffeeBeans", "grind_beans", 1
+        arrow "grind_beans", "GroundCoffee", 1
+        arrow "BoiledWater", "brew_coffee", 1
+        arrow "GroundCoffee", "brew_coffee", 1
+        arrow "Filter", "brew_coffee", 1
+        arrow "brew_coffee", "CoffeeInPot", 1
+        arrow "CoffeeInPot", "pour_coffee", 1
+        arrow "Cup", "pour_coffee", 1
+    }}
 
-    #[test]
-    fn test_dsl() {
-        let j = pflow_dsl! {
-            declare "petriNet"
-            cell "b", 1, 0, [1, 1]
-            cell "a", 1, 0, [1, 2]
-            func "f", "default", [2, 1]
-            func "g", "default", [2, 2]
-            arrow "a", "f", 1
-            guard "b", "g", 1
-        };
+    // Model using state machine diagram notation
+    state_machine!( CoffeeMachineUsingDiagram {
+        ModelType::PetriNet;
+        Water --> boil_water;
+        boil_water --> BoiledWater;
+        CoffeeBeans --> grind_beans;
+        grind_beans --> GroundCoffee;
+        BoiledWater --> brew_coffee;
+        GroundCoffee --> brew_coffee;
+        Filter --> brew_coffee;
+        brew_coffee --> CoffeeInPot;
+        CoffeeInPot --> pour_coffee;
+        Cup --> pour_coffee;
+    });
 
-        let initial = j.vm.initial_vector();
-        assert_eq!(initial, vec![1, 1]);
+    state_machine!( SimpleStateMachine {
+       Crash --> [*];
+       Moving --> Crash;
+       Moving --> Still;
+       Still --> Moving;
+       Still --> [*];
+       [*] --> Still;
+   });
 
-        j.net.transitions.get("f").expect("expected transition");
+    petri_net!( CoffeeMachineUsingPetriNet {{
+        "modelType": "petriNet",
+        "version": "v0",
+        "places": {
+            "Water":        { "offset": 0, "initial": 1, "capacity": 1, "x": 100, "y": 200 },
+            "BoiledWater":  { "offset": 1, "initial": 0, "capacity": 1, "x": 260, "y": 200 },
+            "CoffeeBeans":  { "offset": 2, "initial": 1, "capacity": 1, "x": 376, "y": 434 },
+            "GroundCoffee": { "offset": 3, "initial": 0, "capacity": 1, "x": 541, "y": 469 },
+            "Filter":       { "offset": 4, "initial": 1, "capacity": 1, "x": 660, "y": 200 },
+            "CoffeeInPot":  { "offset": 5, "initial": 0, "capacity": 1, "x": 740, "y": 200 },
+            "Cup":          { "offset": 6, "initial": 1, "capacity": 1, "x": 900, "y": 200 }
+        },
+        "transitions": {
+            "boil_water":  { "offset": 0, "role": "default", "x": 191, "y": 489 },
+            "brew_coffee": { "offset": 1, "role": "default", "x": 548, "y": 118 },
+            "grind_beans": { "offset": 2, "role": "default", "x": 420, "y": 200 },
+            "pour_coffee": { "offset": 3, "role": "default", "x": 820, "y": 200 }
+        },
+        "arcs": [
+            { "source": "Water",        "target": "boil_water",   "weight": 1 },
+            { "source": "boil_water",   "target": "BoiledWater",  "weight": 1 },
+            { "source": "CoffeeBeans",  "target": "grind_beans",  "weight": 1 },
+            { "source": "grind_beans",  "target": "GroundCoffee", "weight": 1 },
+            { "source": "BoiledWater",  "target": "brew_coffee",  "weight": 1 },
+            { "source": "GroundCoffee", "target": "brew_coffee",  "weight": 1 },
+            { "source": "Filter",       "target": "brew_coffee",  "weight": 1 },
+            { "source": "brew_coffee",  "target": "CoffeeInPot",  "weight": 1 },
+            { "source": "CoffeeInPot",  "target": "pour_coffee",  "weight": 1 },
+            { "source": "Cup",          "target": "pour_coffee",  "weight": 1 }
+        ]
+    }});
 
-        let res = j.vm.transform(&initial, "f", 1);
-        assert!(res.ok);
-        assert_eq!(initial, vec![1, 1]); // input state is _not_ mutated
-        assert_eq!(res.output, vec![1, 0]);
-    }
-
-    #[test]
-    fn test_json_dsl() {
-        let j = pflow_json! {
-            {
-                "modelType": "petriNet",
-                "version": "v0",
-                "places": {
-                    "a": { "offset": 0, "initial": 1, "capacity": 1, "x": 0, "y": 0 },
-                    "b": { "offset": 1, "initial": 1, "capacity": 1, "x": 0, "y": 0 }
-                },
-                "transitions": {
-                    "f": { "role": "default", "x": 0, "y": 0 }
-                },
-                "arcs": [
-                    { "source": "a", "target": "f", "weight": 1 },
-                    { "source": "b", "target": "f", "weight": 1 }
-                ]
+    impl State for CoffeeMachineUsingPetriNet {
+        fn evaluate_preconditions(&self) -> Result<bool, StateMachineError> {
+            let mut state = self.state.lock().expect("lock failed");
+            for (label, place) in &self.model.net.places {
+                if let Some(initial) = place.initial {
+                    if initial != 0 {
+                        let measurement = self.evaluate_resource(label)?;
+                        let offset = usize::try_from(place.offset).expect("offset conversion failed");
+                        state[offset] = measurement;
+                    }
+                }
             }
-        };
+            drop(state);
+            Ok(true)
+        }
 
-        let initial = j.vm.initial_vector();
-        assert_eq!(initial, vec![1, 1]);
-        j.net.transitions.get("f").expect("expected transition");
-    }
-
-    #[test]
-    fn test_model() {
-        let model = declaration_function! {
-            |p: &mut dyn dsl::Dsl| {
-                p.model_type("petriNet");
-                p.cell("b", Some(1), None, 0, 0);
-                p.func("f", "default", 1, 1);
-                p.cell("a", Some(1), None, 0, 0);
-                p.func("g", "default", 1, 1);
-                p.arrow("a", "f", 1);
-                p.guard("b", "g", 1);
-            }
-        };
-
-        assert_eq!(model.net.model_type, "petriNet");
-        let zblob = model.net.to_zblob();
-        assert_eq!(
-            zblob.ipfs_cid,
-            "zb2rhXMTtKZq96QpdSzkSYmEPKttirMw4okCG8c5QxwygAvWG"
-        );
-    }
-
-    #[test]
-    fn test_workflow_model() {
-        let model = pflow_dsl! {
-            declare "workflow"
-            cell "Water", 0, 1, [100, 300]
-            cell "CoffeeBeans", 0, 1, [180, 300]
-            cell "BoiledWater", 0, 1, [195, 397]
-            cell "GroundCoffee", 0, 1, [250, 339]
-            cell "Filter", 0, 1, [290, 280]
-            cell "CoffeeInPot", 0, 1, [328, 366]
-            cell "Cup", 0, 1, [365, 312]
-            cell "step0", 1, 1, [100, 100]
-            cell "step1", 0, 1, [180, 100]
-            cell "step2", 0, 1, [260, 100]
-            cell "step3", 0, 1, [340, 100]
-            cell "step4", 0, 1, [420, 100]
-            func "boil_water", "coffee_machine", [100, 200]
-            func "brew_coffee", "coffee_machine", [260, 200]
-            func "grind_beans", "coffee_machine", [180, 200]
-            func "pour_coffee", "coffee_machine", [340, 200]
-            arrow "Water", "boil_water", 1
-            arrow "CoffeeBeans", "grind_beans", 1
-            arrow "BoiledWater", "brew_coffee", 1
-            arrow "GroundCoffee", "brew_coffee", 1
-            arrow "Filter", "brew_coffee", 1
-            arrow "CoffeeInPot", "pour_coffee", 1
-            arrow "Cup", "pour_coffee", 1
-            arrow "step0", "boil_water", 1
-            arrow "boil_water", "step1", 1
-            arrow "step1", "grind_beans", 1
-            arrow "grind_beans", "step2", 1
-            arrow "step2", "brew_coffee", 1
-            arrow "brew_coffee", "step3", 1
-            arrow "step3", "pour_coffee", 1
-            arrow "pour_coffee", "step4", 1
-        };
-
-        let zb = model.net.to_zblob();
-        println!("https://pflow.dev?z={}", zb.base64_zipped);
-        assert_eq!(
-            zb.ipfs_cid,
-            "zb2rhcgvzu3CJ7KaRmySuR253VD2DFPqyQftHhDMKAPaQRzjE"
-        );
-
-        let state = Arc::new(Mutex::new(model.vm.initial_vector()));
-        {
-            let mut state_lock = state.lock().expect("state lock");
-            let res = model.vm.transform(&state_lock, "boil_water", 1);
-            if res.ok {
-                println!("{res:?}");
-                *state_lock = res.output;
-                drop(state_lock);
-            } else {
-                panic!("expected ok");
+        fn evaluate_resource(&self, label: &str) -> Result<i32, StateMachineError> {
+            println!("Measuring resource: {label}");
+            match label {
+                "Water" | "CoffeeBeans" | "Filter" | "Cup" => Ok(1),
+                _ => Ok(0),
             }
         }
+    }
+
+    #[derive(Debug)]
+    struct Context {
+        #[allow(unused)]
+        pub msg: String,
+    }
+
+    impl Process<Context> for CoffeeMachineUsingPetriNet {
+        fn run(&self, context: Context) -> Vec<Event<Context>> {
+            let action = self.next_action();
+            if action.is_empty() || !self.evaluate_preconditions().unwrap_or(false) {
+                vec![]
+            } else {
+                let evt = Event {
+                    action: "__begin__".to_string(),
+                    seq: 0,
+                    state: self.model.vm.initial_vector(),
+                    data: context,
+                };
+                self.run_impl(Some(&action[0]), None, vec![evt])
+            }
+        }
+
+        fn run_impl(
+            &self,
+            action: Option<&str>,
+            seq: Option<u64>,
+            mut event_log: Vec<Event<Context>>,
+        ) -> Vec<Event<Context>> {
+            let mut current_action = action.map(ToString::to_string);
+            let mut current_seq = seq.unwrap_or(0) + 1;
+
+            while let Some(ref action) = current_action {
+                if let Some(transaction) = self.process_action(action, current_seq) {
+                    event_log.push(transaction);
+                } else {
+                    break;
+                }
+                current_action = self.next_action().first().cloned();
+                current_seq += 1;
+            }
+
+            let evt = Event {
+                action: "__end__".to_string(),
+                seq: current_seq + 1,
+                state: self.state.lock().expect("lock failed").clone(),
+                data: Context { msg: "Coffee machine stopped".to_string() },
+            };
+            event_log.push(evt);
+            event_log
+        }
+
+        /// calculate the next action to be executed based on the current state
+        /// transform state before calling execute_action
+        ///
+        /// # Panics
+        ///
+        /// Panics if the lock fails
+        fn process_action(&self, action: &str, seq: u64) -> Option<Event<Context>> {
+            let mut state = self.state.lock().expect("lock failed");
+            let res = self.model.vm.transform(&state, action, 1);
+
+            if res.is_ok() {
+                *state = res.output;
+                let evt = Event {
+                    action: action.to_string(),
+                    seq,
+                    state: state.clone(),
+                    data: Context { msg: format!("completed! #{seq}: {action}") },
+                };
+                let transaction = self.execute_action(evt);
+
+                match transaction {
+                    Err(e) => {
+                        let evt = Event {
+                            action: format!("__error__::{action}::{e:?}"),
+                            seq,
+                            state: state.clone(),
+                            data: Context { msg: "Action failed".to_string() },
+                        };
+                        Some(evt)
+                    }
+                    Ok(transaction) => Some(transaction),
+                }
+            } else {
+                None
+            }
+        }
+
+        fn next_action(&self) -> Vec<String> {
+            let state = self.state.lock().expect("lock failed");
+            for action in self.model.vm.transitions.keys() {
+                if self.model.vm.transform(&state, action, 1).is_ok() {
+                    return vec![action.clone()];
+                }
+            }
+            vec![]
+        }
+
+        fn execute_action(&self, event: Event<Context>) -> Result<Event<Context>, StateMachineError> {
+            println!("{} - Executing action: {}", event.seq, event.action);
+            match event.action.as_str() {
+                "boil_water" | "brew_coffee" | "grind_beans" | "pour_coffee" => Ok(event),
+                _ => Err(StateMachineError::InvalidAction),
+            }
+        }
+    }
+
+    #[test]
+    fn test_coffee_machine() {
+        let cm = CoffeeMachineUsingPetriNet::new();
+        println!("https://pflow.dev/?z={}", cm.model.net.to_zblob().base64_zipped);
+        for event in cm.run(Context { msg: "Start".to_string() }) {
+            println!("{event:?}");
+        }
+    }
+
+    #[test]
+    fn test_coffee_machine_using_dsl() {
+        let cm = CoffeeMachineUsingDsl::new();
+        println!("https://pflow.dev/?z={}", cm.model.net.to_zblob().base64_zipped);
+    }
+
+    #[test]
+    fn test_coffee_machine_using_diagram() {
+        let cm = CoffeeMachineUsingDiagram::new();
+        println!("https://pflow.dev/?z={}", cm.model.net.to_zblob().base64_zipped);
+    }
+
+    #[test]
+    fn test_simple_state_machine() {
+        let sm = SimpleStateMachine::new();
+        println!("https://pflow.dev/?z={}", sm.model.net.to_zblob().base64_zipped);
     }
 }

@@ -3,7 +3,6 @@ use crate::zblob::Zblob;
 use serde::{Deserialize, Serialize};
 use serde_json::{Error, Value};
 use std::collections::HashMap;
-use std::convert::TryInto;
 
 /// PetriNet stores petri-net elements used during the construction of a petri-net.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -74,6 +73,7 @@ impl PetriNet {
     ///
     /// Panics if the diagram is invalid
     pub fn from_state_diagram(contents: String) -> Self {
+        let contents = contents.replace('\n', "");
         let mut net = PetriNet::new();
         net.model_type = "workflow".to_string();
         let mut x = 20;
@@ -143,6 +143,7 @@ impl PetriNet {
     ///
     /// Panics if the diagram is invalid
     pub fn from_diagram(contents: String) -> Self {
+        let contents = contents.replace('\n', "");
         let mut net = PetriNet::new();
         let mut x = 20;
         let y = 200;
@@ -155,8 +156,12 @@ impl PetriNet {
         let first_line = lines[0];
         assert!(first_line.starts_with("ModelType::"), "First line must specify the model type in the format ModelType::[type]");
 
-        let model_type = first_line.replace("ModelType::", "");
-        net.model_type = model_type;
+        net.model_type = match first_line.replace("ModelType::", "").to_lowercase().as_str() {
+            "petrinet" => "petriNet".to_string(),
+            "workflow" => "workflow".to_string(),
+            "elementary" => "elementary".to_string(),
+            _ => panic!("Invalid ModelType: must be one of petrinet, workflow, or elementary"),
+        };
 
         for line in &lines[1..] {
             if line.is_empty() {
@@ -243,6 +248,7 @@ impl Default for Place {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Transition {
     pub role: Option<String>,
+    pub offset: i32,
     pub x: i32,
     pub y: i32,
 }
@@ -251,6 +257,7 @@ impl Default for Transition {
     fn default() -> Self {
         Self {
             role: Option::from("default".to_string()),
+            offset: 0,
             x: 0,
             y: 0,
         }
@@ -313,11 +320,17 @@ impl PetriNet {
     }
 
     /// Adds a transition to the petri-net.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the transition index overflows.
     pub fn add_transition(&mut self, label: &str, role: &str, x: i32, y: i32) {
+        let offset = i32::try_from(self.transitions.len()).expect("transition index overflow");
         self.transitions.insert(
             label.to_string(),
             Transition {
                 role: Option::from(role.to_string()),
+                offset,
                 x,
                 y,
             },
@@ -367,16 +380,16 @@ mod tests {
             "chopstick5": { "offset": 14, "initial": 1, "x": 774, "y": 536 }
         },
         "transitions": {
-            "eat1": { "x": 610, "y": 370 },
-            "think1": { "x": 372, "y": 247 },
-            "eat2": { "x": 874, "y": 281 },
-            "think2": { "x": 876, "y": 42 },
-            "eat3": { "x": 1115, "y": 348 },
-            "think3": { "x": 1309, "y": 215 },
-            "eat4": { "x": 1034, "y": 691 },
-            "think4": { "x": 1227, "y": 896 },
-            "eat5": { "x": 673, "y": 688 },
-            "think5": { "x": 483, "y": 887 }
+            "eat1": { "offset": 0, "x": 610, "y": 370 },
+            "think1": { "offset": 1, "x": 372, "y": 247 },
+            "eat2": { "offset": 2, "x": 874, "y": 281 },
+            "think2": { "offset": 3, "x": 876, "y": 42 },
+            "eat3": { "offset": 4, "x": 1115, "y": 348 },
+            "think3": { "offset": 5, "x": 1309, "y": 215 },
+            "eat4": { "offset": 6, "x": 1034, "y": 691 },
+            "think4": { "offset": 7, "x": 1227, "y": 896 },
+            "eat5": { "offset": 8, "x": 673, "y": 688 },
+            "think5": { "offset": 9, "x": 483, "y": 887 }
         },
         "arcs": [
             { "source": "chopstick1", "target": "eat1" },
@@ -447,7 +460,7 @@ mod tests {
         assert_eq!(net.places.len(), 15);
         assert_eq!(
             zblob.ipfs_cid,
-            "zb2rhbJgSpkiifamgPLnyfEDxRKRBjPru2ojyYSBMitPNjXTx"
+            "zb2rhZTUivNkdVe6qCEQ3oFe4xEbhSbVhfRj1kdZhKrTcw2Nk"
         );
     }
 

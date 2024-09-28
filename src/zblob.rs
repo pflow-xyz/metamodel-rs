@@ -42,6 +42,7 @@ impl Default for Zblob {
     }
 }
 
+// TODO: replace w/ error enum
 const INVALID_ZIP: &str = "invalid zip";
 const FAILED_TO_CONVERT: &str = "failed to convert to json";
 const FAILED_TO_DECOMPRESS: &str = "failed to decompress";

@@ -6,4 +6,4 @@ clippy:
 
 .PHONY: test
 test:
-	cargo test --all
+	cargo test --all -- --nocapture

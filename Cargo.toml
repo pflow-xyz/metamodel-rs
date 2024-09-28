@@ -14,11 +14,11 @@ repository = "https://github.com/pflow-dev/metamodel-rs"
 path = "src/lib.rs"
 
 [dependencies]
-base64 = "0.21.7"
-brotli = "3.4.0"
-cjson = "0.1.2"
-embed-doc-image = "0.1.4"
-libipld = "0.16.0"
-multibase = "0.9.1"
+base64 = "0.22"
+brotli = "6.0"
+cjson = "0.1"
+embed-doc-image = "0.1"
+libipld = "0.16"
+multibase = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

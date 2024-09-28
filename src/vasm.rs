@@ -56,6 +56,7 @@ pub struct Transition {
     delta: Vector,
     guards: GuardMap,
     allow_reentry: bool,
+    offset: i32,
 }
 
 
@@ -71,6 +72,7 @@ pub struct StateMachine {
     pub places: Vec<String>,
     pub transitions: TransitionMap,
     pub roles: RoleMap,
+    pub actions: Vec<String>,
 }
 
 fn model_type_from_string(model_type: &str) -> ModelType {
@@ -113,6 +115,9 @@ impl StateMachine {
         let net = &mut PetriNet::new();
         let mut sm = net.declare(declaration).as_vasm();
         sm.model_type = model_type_from_string(&net.model_type);
+        let mut transitions: Vec<_> = net.transitions.iter().collect();
+        transitions.sort_by_key(|(_, v)| v.offset);
+        sm.actions = transitions.into_iter().map(|(k, _)| k.clone()).collect();
         sm
     }
 
@@ -143,6 +148,7 @@ impl StateMachine {
                         delta: vec![0; vector_size],
                         guards: GuardMap::new(),
                         allow_reentry: false,
+                        offset: v.offset,
                     },
                 )
             })
@@ -214,6 +220,9 @@ impl StateMachine {
             };
             places[offset_result].clone_from(k);
         });
+        let mut sorted_transitions: Vec<_> = transitions.iter().collect();
+        sorted_transitions.sort_by_key(|(_, v)| v.offset);
+        let actions = sorted_transitions.into_iter().map(|(k, _)| k.clone()).collect();
 
         Self {
             model_type: model_type_from_string(&model.model_type),
@@ -222,6 +231,7 @@ impl StateMachine {
             places,
             transitions,
             roles,
+            actions,
         }
     }
 

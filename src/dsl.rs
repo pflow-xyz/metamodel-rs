@@ -91,7 +91,12 @@ impl<'a> Builder<'a> {
 
 impl Dsl for Builder<'_> {
     fn model_type(&mut self, model_type: &str) {
-        self.net.model_type = model_type.to_string();
+        self.net.model_type = match model_type.to_lowercase().as_str() {
+            "petrinet" => "petriNet".to_string(),
+            "workflow" => "workflow".to_string(),
+            "elementary" => "elementary".to_string(),
+            _ => panic!("invalid model type"),
+        }
     }
 
     fn cell<'b>(
