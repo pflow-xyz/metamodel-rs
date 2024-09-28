@@ -102,6 +102,7 @@ pub use crate::model::*;
 pub use crate::vasm::*;
 
 #[allow(unused)]
+#[macro_export]
 macro_rules! pflow_dsl {
     ($($name:ident $($args:expr),*)*) => {{
         declaration_function! {
@@ -135,6 +136,7 @@ macro_rules! pflow_dsl {
 }
 
 #[allow(unused)]
+#[macro_export]
 macro_rules! declaration_function {
     ($($flow_dsl:tt)*) => {{
         let model = model::Model::new(
@@ -145,6 +147,7 @@ macro_rules! declaration_function {
 }
 
 #[allow(unused)]
+#[macro_export]
 macro_rules! pflow_json {
     ($($flow_json:tt)*) => {{
         let mut net = petri_net::PetriNet::from_json_value(
@@ -161,6 +164,7 @@ macro_rules! pflow_json {
 }
 
 #[allow(unused)]
+#[macro_export]
 macro_rules! pflow_diagram {
     ($($workflow_declaration:tt)*) => {
         {
