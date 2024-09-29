@@ -72,71 +72,70 @@ impl PetriNet {
     /// # Panics
     ///
     /// Panics if the diagram is invalid
-    pub fn from_state_diagram(contents: String) -> Self {
-        let contents = contents.replace('\n', "");
-        let mut net = PetriNet::new();
-        net.model_type = "workflow".to_string();
-        let mut x = 20;
-        let y = 200;
-        let grid = 80;
+pub fn from_state_diagram(contents: String) -> Self {
+    let contents = contents.replace('\n', "").replace(" ", "");
+    let mut net = PetriNet::new();
+    net.model_type = "workflow".to_string();
+    let mut x = 20;
+    let y = 200;
+    let grid = 80;
 
-        let lines: Vec<&str> = contents.split(';').map(str::trim).collect();
-        assert!(!lines.is_empty(), "Contents cannot be empty");
+    let lines: Vec<&str> = contents.split(';').map(str::trim).collect();
+    assert!(!lines.is_empty(), "Contents cannot be empty");
 
-        for line in lines {
-            let action = line.to_string();
-            if action.is_empty() {
-                continue;
-            }
-            let parts: Vec<&str> = action.split("-->").map(str::trim).collect();
-            if parts.len() != 2 {
-                continue;
-            }
-
-            let input = parts[0];
-            let output = parts[1];
-
-            if !net.places.contains_key(input) {
-                x += grid;
-                let place_index: i32 = net.places.len().try_into().expect("place index overflow");
-                net.add_place(input, place_index, None, None, x, y);
-            }
-
-            if !net.transitions.contains_key(&action) {
-                x += grid;
-                net.add_transition(&action, "default", x, y);
-            }
-
-            if !net.places.contains_key(output) {
-                x += grid;
-                let place_index: i32 = net.places.len().try_into().expect("place index overflow");
-                net.add_place(input, place_index, None, None, x, y);
-            }
-
-            net.add_arc(ArcParams {
-                source: input,
-                target: &action,
-                weight: Some(1),
-                consume: Some(true),
-                produce: Some(false),
-                inhibit: None,
-                read: None,
-            });
-
-            net.add_arc(ArcParams {
-                source: &action,
-                target: output,
-                weight: Some(1),
-                consume: Some(false),
-                produce: Some(true),
-                inhibit: None,
-                read: None,
-            });
+    for line in lines {
+        let action = line.to_string();
+        if action.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = action.split("-->").map(str::trim).collect();
+        if parts.len() != 2 {
+            continue;
         }
 
-        net
+        let input = parts[0];
+        let output = parts[1];
+
+        if !net.places.contains_key(input) {
+            x += grid;
+            let place_index: i32 = net.places.len().try_into().expect("place index overflow");
+            net.add_place(input, place_index, None, None, x, y);
+        }
+
+        if !net.transitions.contains_key(&action) {
+            x += grid;
+            net.add_transition(&action, "default", x, y);
+        }
+
+        if !net.places.contains_key(output) {
+            x += grid;
+            let place_index: i32 = net.places.len().try_into().expect("place index overflow");
+            net.add_place(output, place_index, None, None, x, y);
+        }
+
+        net.add_arc(ArcParams {
+            source: input,
+            target: &action,
+            weight: Some(1),
+            consume: Some(true),
+            produce: Some(false),
+            inhibit: None,
+            read: None,
+        });
+
+        net.add_arc(ArcParams {
+            source: &action,
+            target: output,
+            weight: Some(1),
+            consume: Some(false),
+            produce: Some(true),
+            inhibit: None,
+            read: None,
+        });
     }
 
+    net
+}
     /// Creates a new `PetriNet` object from the given diagram string.
     ///
     /// # Panics
@@ -487,7 +486,7 @@ mod tests {
     #[test]
     fn test_state_machine_diagram() {
         let contents = r"
-            Crash-->[*];
+            Crash --> [*];
             Moving --> Crash;
             Moving --> Still;
             Still --> Moving;
@@ -497,6 +496,7 @@ mod tests {
 
         let net = PetriNet::from_state_diagram(contents.to_string());
         let zblob = net.to_zblob();
+        println!("{:?}", net.places);
         println!("https://pflow.dev/?z={}", zblob.base64_zipped);
     }
 }

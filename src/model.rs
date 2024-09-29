@@ -79,3 +79,20 @@ impl Model {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model() {
+        let m  = Model::from_diagram("Crash-->[*];Moving-->Crash;Moving-->Still;Still-->Moving;Still-->[*];[*]-->Still;".to_string());
+        assert_eq!(m.net.places.len(), 4);
+        for place in m.net.places.iter() {
+            println!("{place:?}");
+        }
+        for transition in m.net.transitions.iter() {
+            println!("{transition:?}");
+        }
+    }
+}

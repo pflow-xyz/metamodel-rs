@@ -120,13 +120,16 @@ impl StateMachine {
         sm.actions = transitions.into_iter().map(|(k, _)| k.clone()).collect();
         sm
     }
+    pub fn from_model(model: &mut PetriNet) -> Self {
+        Self::from_model_impl(model, None)
+    }
 
     /// Creates a new `StateMachine` object from the given `PetriNet`.
     ///
     /// # Panics
     ///
     /// This function will panic if petri net is not valid.
-    pub fn from_model(model: &mut PetriNet) -> Self {
+    fn from_model_impl(model: &mut PetriNet, re_entry: Option<bool>) -> Self {
         let model_type = model_type_from_string(&model.model_type);
         model.populate_arc_attributes();
         let mut roles = RoleMap::new();
@@ -147,7 +150,7 @@ impl StateMachine {
                         role: v.role.clone().unwrap_or_else(|| "default".to_string()),
                         delta: vec![0; vector_size],
                         guards: GuardMap::new(),
-                        allow_reentry: false,
+                        allow_reentry: re_entry.unwrap_or(false),
                         offset: v.offset,
                     },
                 )
@@ -165,14 +168,19 @@ impl StateMachine {
 
             let p = if read || produce {
                 model.places.get(&target)
-            } else {
+            } else if consume || inhibit {
                 model.places.get(&source)
+            } else {
+                panic!("unexpected arc type");
             }
-                .unwrap_or_else(|| panic!("place not found source:{source} target:{target}"));
+                .expect("place not found");
+
             let t = if read || produce {
                 transitions.get_mut(&source)
-            } else {
+            } else if consume || inhibit {
                 transitions.get_mut(&target)
+            } else {
+                panic!("unexpected arc type");
             }
                 .expect("transition not found");
 
@@ -299,7 +307,7 @@ impl StateMachine {
         multiple: i32,
     ) -> Transaction {
         let role = transition.role.clone();
-        let (output, _, overflow, underflow) =
+        let (output, _, mut overflow, underflow) =
             vector_add(&self.capacity, state, &transition.delta, multiple);
         let inhibited = self.guard_fails(state, transition, multiple);
         let workflow_output = output
@@ -307,29 +315,35 @@ impl StateMachine {
             .map(|x| {
                 match x {
                     0 | -1 => 0, // allow retry / reentry
-                    _ => 1, // no other values allowed
+                    2 => {
+                        overflow = true;
+                        1
+                    },      // allow transition
+                    1 => 1, // no other values allowed
+                    _ => -1, // no other values allowed
                 }
             })
             .collect::<Vec<i32>>();
         let output_state_count = workflow_output.iter().filter(|&x| *x > 0).count();
-        if !inhibited && overflow && output_state_count == 1 && transition.allow_reentry {
-            return Transaction {
+        let ok = !overflow && output_state_count == 1 && !inhibited;
+        if transition.allow_reentry && !ok && overflow {
+            Transaction {
                 output: workflow_output,
                 ok: true,
                 role,
                 inhibited,
                 overflow: false,
                 underflow,
-            };
-        }
-
-        Transaction {
-            output: workflow_output,
-            ok: output_state_count == 1 && !inhibited,
-            role,
-            inhibited,
-            overflow,
-            underflow,
+            }
+        } else {
+            Transaction {
+                output: workflow_output,
+                ok,
+                role,
+                inhibited,
+                overflow,
+                underflow,
+            }
         }
     }
 }
@@ -431,13 +445,42 @@ impl Vasm for StateMachine {
     }
 }
 
-#[test]
-fn test_default_net() {
-    let net = &mut PetriNet::new();
-    let mut mm = net.declare(|m| {
-        m.model_type("petriNet");
-    });
-    let vasm = mm.as_vasm();
-    let state = vasm.initial_vector();
-    assert!(state.is_empty());
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_net() {
+        let net = &mut PetriNet::new();
+        let mut mm = net.declare(|m| {
+            m.model_type("petriNet");
+        });
+        let vasm = mm.as_vasm();
+        let state = vasm.initial_vector();
+        assert!(state.is_empty());
+    }
+
+    #[test]
+    fn test_state_machine_diagram() {
+        let contents = r"
+            Crash --> [*];
+            Moving --> Crash;
+            Moving --> Still;
+            Still --> Moving;
+            Still --> [*];
+            [*] --> Still;
+        ";
+
+        let mut net = PetriNet::from_state_diagram(contents.to_string());
+        let mut mm = net.declare(|m| {
+            m.model_type("workflow");
+        });
+        let vm = &mm.as_vasm();
+        assert!(vm.places.contains(&"Crash".to_string()), "Crash place not found");
+        assert!(vm.places.contains(&"Moving".to_string()), "Moving place not found");
+        assert!(vm.places.contains(&"Still".to_string()), "Still place not found");
+        assert!(vm.places.contains(&"[*]".to_string()), "[*] place not found");
+        let zblob = net.to_zblob();
+        println!("https://pflow.dev/?z={}", zblob.base64_zipped);
+    }
 }
