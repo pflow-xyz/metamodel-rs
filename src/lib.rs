@@ -293,7 +293,7 @@ pub trait Process<TContext> {
 }
 
 /// A transaction is a single unit of work that is executed by a processor
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Transaction<TPayload> {
     pub model: Model,
     pub state: Arc<Mutex<Vector>>,
