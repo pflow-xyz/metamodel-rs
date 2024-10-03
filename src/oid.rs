@@ -11,7 +11,8 @@ pub struct Oid {
 
 impl fmt::Display for Oid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.cid.to_string_of_base(multibase::Base::Base58Btc)
+        self.cid
+            .to_string_of_base(multibase::Base::Base58Btc)
             .map_or(Err(fmt::Error), |s| write!(f, "{s}"))
     }
 }

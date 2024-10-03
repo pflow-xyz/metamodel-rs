@@ -119,16 +119,15 @@ impl Dsl for Builder<'_> {
 
     fn arrow(&mut self, source: &str, target: &str, weight: i32) {
         assert!(weight > 0, "weight must be positive");
-        self.net
-            .add_arc(ArcParams {
-                source,
-                target,
-                weight: Some(weight),
-                consume: None,
-                produce: None,
-                inhibit: None,
-                read: None,
-            });
+        self.net.add_arc(ArcParams {
+            source,
+            target,
+            weight: Some(weight),
+            consume: None,
+            produce: None,
+            inhibit: None,
+            read: None,
+        });
     }
 
     fn guard(&mut self, source: &str, target: &str, weight: i32) {
@@ -158,7 +157,7 @@ pub struct ArcParams<'a> {
 #[cfg(test)]
 mod tests {
     use crate::model::Model;
-    use crate::vasm::{Transaction, Vasm};
+    use crate::vasm::{Tx, Vasm};
 
     use super::*;
 
@@ -182,31 +181,31 @@ mod tests {
             Self { model, state }
         }
 
-        fn assert_underflow(&self, action: &str) -> Transaction {
+        fn assert_underflow(&self, action: &str) -> Tx {
             let res = self.assert_fail(action);
             assert!(res.underflow, "expected underflow");
             res
         }
 
-        fn assert_overflow(&self, action: &str) -> Transaction {
+        fn assert_overflow(&self, action: &str) -> Tx {
             let res = self.assert_fail(action);
             assert!(res.overflow, "expected overflow");
             res
         }
 
-        fn assert_inhibited(&self, action: &str) -> Transaction {
+        fn assert_inhibited(&self, action: &str) -> Tx {
             let res = self.assert_fail(action);
             assert!(res.inhibited, "expected inhibited");
             res
         }
 
-        fn assert_fail(&self, action: &str) -> Transaction {
+        fn assert_fail(&self, action: &str) -> Tx {
             let res = self.model.vm.transform(&self.state, action, 1);
             assert!(res.is_err(), "expected fail");
             res
         }
 
-        fn assert_pass(&mut self, action: &str) -> Transaction {
+        fn assert_pass(&mut self, action: &str) -> Tx {
             let res = self.model.vm.transform(&self.state, action, 1);
             assert!(res.is_ok(), "expected pass");
             self.state.clone_from(&res.output);

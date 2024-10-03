@@ -53,7 +53,11 @@ impl ImageBuilder for Display {
         let w = width.unwrap_or(400);
         let h = height.unwrap_or(400);
         let mut buffer = self.buffer.lock().unwrap();
-        write!(buffer, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\">").unwrap();
+        write!(
+            buffer,
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\">"
+        )
+        .unwrap();
         self.write_defs(&mut buffer);
     }
 
@@ -65,19 +69,31 @@ impl ImageBuilder for Display {
     }
 
     fn rect(&self, x: i32, y: i32, width: i32, height: i32, extra: &str) {
-        self.write_element(format!("<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" {} />", x, y, width, height, extra));
+        self.write_element(format!(
+            "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" {} />",
+            x, y, width, height, extra
+        ));
     }
 
     fn circle(&self, x: i32, y: i32, radius: i32, extra: &str) {
-        self.write_element(format!("<circle cx=\"{}\" cy=\"{}\" r=\"{}\" {} />", x, y, radius, extra));
+        self.write_element(format!(
+            "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" {} />",
+            x, y, radius, extra
+        ));
     }
 
     fn text(&self, x: i32, y: i32, text: &str, extra: &str) {
-        self.write_element(format!("<text x=\"{}\" y=\"{}\" {}>{}</text>", x, y, extra, text));
+        self.write_element(format!(
+            "<text x=\"{}\" y=\"{}\" {}>{}</text>",
+            x, y, extra, text
+        ));
     }
 
     fn line(&self, x1: i32, y1: i32, x2: i32, y2: i32, extra: &str) {
-        self.write_element(format!("<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" {} />", x1, y1, x2, y2, extra));
+        self.write_element(format!(
+            "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" {} />",
+            x1, y1, x2, y2, extra
+        ));
     }
 
     fn group(&self) {
@@ -121,13 +137,19 @@ impl ImageBuilder for Display {
         } else {
             "url(#markerArrow1)"
         };
-        let extra = format!("stroke=\"#000000\" fill=\"#000000\" marker-end=\"{}\"", marker);
+        let extra = format!(
+            "stroke=\"#000000\" fill=\"#000000\" marker-end=\"{}\"",
+            marker
+        );
 
         let place = net.places.get(&arc.source);
         let transition = net.transitions.get(&arc.target);
         if place.is_none() {
             let p = net.places.get(&arc.target).expect("Place not found");
-            let t = net.transitions.get(&arc.source).expect("Transition not found");
+            let t = net
+                .transitions
+                .get(&arc.source)
+                .expect("Transition not found");
             self.line(t.x, t.y, p.x, p.y, &extra);
         } else {
             let p = place.expect("Place not found");
@@ -154,9 +176,9 @@ impl ImageBuilder for Display {
 
 // Implement the ImageOutput trait for Display
 impl ImageOutput for Display {
-
     fn encode_url_component(component: &str) -> String {
-        component.chars()
+        component
+            .chars()
             .map(|c| match c {
                 ' ' => "%20".to_string(),
                 '!' => "%21".to_string(),
@@ -221,7 +243,8 @@ impl ImageOutput for Display {
         let pretty_json = serde_json::to_string_pretty(&self.model.net.to_json().unwrap()).unwrap();
         let model_type = self.model.net.model_type.clone();
 
-        format!(r#"<!DOCTYPE html>
+        format!(
+            r#"<!DOCTYPE html>
         <html lang="en">
             <head>
                 <meta charset="utf-8"/>
@@ -240,7 +263,8 @@ impl ImageOutput for Display {
                     {pretty_json}
                 </textarea>
             </body>
-        </html>"#)
+        </html>"#
+        )
     }
 }
 

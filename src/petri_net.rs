@@ -72,70 +72,70 @@ impl PetriNet {
     /// # Panics
     ///
     /// Panics if the diagram is invalid
-pub fn from_state_diagram(contents: String) -> Self {
-    let contents = contents.replace('\n', "").replace(" ", "");
-    let mut net = PetriNet::new();
-    net.model_type = "workflow".to_string();
-    let mut x = 20;
-    let y = 200;
-    let grid = 80;
+    pub fn from_state_diagram(contents: String) -> Self {
+        let contents = contents.replace('\n', "").replace(" ", "");
+        let mut net = PetriNet::new();
+        net.model_type = "workflow".to_string();
+        let mut x = 20;
+        let y = 200;
+        let grid = 80;
 
-    let lines: Vec<&str> = contents.split(';').map(str::trim).collect();
-    assert!(!lines.is_empty(), "Contents cannot be empty");
+        let lines: Vec<&str> = contents.split(';').map(str::trim).collect();
+        assert!(!lines.is_empty(), "Contents cannot be empty");
 
-    for line in lines {
-        let action = line.to_string();
-        if action.is_empty() {
-            continue;
+        for line in lines {
+            let action = line.to_string();
+            if action.is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = action.split("-->").map(str::trim).collect();
+            if parts.len() != 2 {
+                continue;
+            }
+
+            let input = parts[0];
+            let output = parts[1];
+
+            if !net.places.contains_key(input) {
+                x += grid;
+                let place_index: i32 = net.places.len().try_into().expect("place index overflow");
+                net.add_place(input, place_index, None, None, x, y);
+            }
+
+            if !net.transitions.contains_key(&action) {
+                x += grid;
+                net.add_transition(&action, "default", x, y);
+            }
+
+            if !net.places.contains_key(output) {
+                x += grid;
+                let place_index: i32 = net.places.len().try_into().expect("place index overflow");
+                net.add_place(output, place_index, None, None, x, y);
+            }
+
+            net.add_arc(ArcParams {
+                source: input,
+                target: &action,
+                weight: Some(1),
+                consume: Some(true),
+                produce: Some(false),
+                inhibit: None,
+                read: None,
+            });
+
+            net.add_arc(ArcParams {
+                source: &action,
+                target: output,
+                weight: Some(1),
+                consume: Some(false),
+                produce: Some(true),
+                inhibit: None,
+                read: None,
+            });
         }
-        let parts: Vec<&str> = action.split("-->").map(str::trim).collect();
-        if parts.len() != 2 {
-            continue;
-        }
 
-        let input = parts[0];
-        let output = parts[1];
-
-        if !net.places.contains_key(input) {
-            x += grid;
-            let place_index: i32 = net.places.len().try_into().expect("place index overflow");
-            net.add_place(input, place_index, None, None, x, y);
-        }
-
-        if !net.transitions.contains_key(&action) {
-            x += grid;
-            net.add_transition(&action, "default", x, y);
-        }
-
-        if !net.places.contains_key(output) {
-            x += grid;
-            let place_index: i32 = net.places.len().try_into().expect("place index overflow");
-            net.add_place(output, place_index, None, None, x, y);
-        }
-
-        net.add_arc(ArcParams {
-            source: input,
-            target: &action,
-            weight: Some(1),
-            consume: Some(true),
-            produce: Some(false),
-            inhibit: None,
-            read: None,
-        });
-
-        net.add_arc(ArcParams {
-            source: &action,
-            target: output,
-            weight: Some(1),
-            consume: Some(false),
-            produce: Some(true),
-            inhibit: None,
-            read: None,
-        });
+        net
     }
-
-    net
-}
     /// Creates a new `PetriNet` object from the given diagram string.
     ///
     /// # Panics
@@ -153,9 +153,16 @@ pub fn from_state_diagram(contents: String) -> Self {
 
         // Parse the first line to set the model type
         let first_line = lines[0];
-        assert!(first_line.starts_with("ModelType::"), "First line must specify the model type in the format ModelType::[type]");
+        assert!(
+            first_line.starts_with("ModelType::"),
+            "First line must specify the model type in the format ModelType::[type]"
+        );
 
-        net.model_type = match first_line.replace("ModelType::", "").to_lowercase().as_str() {
+        net.model_type = match first_line
+            .replace("ModelType::", "")
+            .to_lowercase()
+            .as_str()
+        {
             "petrinet" => "petriNet".to_string(),
             "workflow" => "workflow".to_string(),
             "elementary" => "elementary".to_string(),
@@ -176,14 +183,20 @@ pub fn from_state_diagram(contents: String) -> Self {
             let state = if first_param_is_state {
                 parts[0]
             } else {
-                assert!(second_param_is_state, "Second param must be uppercased state");
+                assert!(
+                    second_param_is_state,
+                    "Second param must be uppercased state"
+                );
                 parts[1]
             };
 
             let action = if first_param_is_state {
                 parts[1]
             } else {
-                assert!(second_param_is_state, "Second param must be uppercase state");
+                assert!(
+                    second_param_is_state,
+                    "Second param must be uppercase state"
+                );
                 parts[0]
             };
 
@@ -199,21 +212,13 @@ pub fn from_state_diagram(contents: String) -> Self {
             }
 
             net.add_arc(ArcParams {
-                source: if first_param_is_state {
-                    state
-                } else {
-                    action
-                },
-                target: if first_param_is_state {
-                    action
-                } else {
-                    state
-                },
+                source: if first_param_is_state { state } else { action },
+                target: if first_param_is_state { action } else { state },
                 weight: Some(1),
                 consume: Some(first_param_is_state),
                 produce: Some(second_param_is_state),
                 inhibit: None, // FIXME: not currently supported
-                read: None, // FIXME not currently supported
+                read: None,    // FIXME not currently supported
             });
         }
 
@@ -337,10 +342,7 @@ impl PetriNet {
     }
 
     /// Adds an arc to the petri-net.
-    pub fn add_arc(
-        &mut self,
-        params: ArcParams<'_>,
-    ) {
+    pub fn add_arc(&mut self, params: ArcParams<'_>) {
         self.arcs.push(Arrow {
             source: params.source.to_string(),
             target: params.target.to_string(),
@@ -436,8 +438,8 @@ mod tests {
 
     #[test]
     fn test_importing_json() {
-        let petri_net = PetriNet::from_json_str(DINING_PHILOSOPHERS)
-            .expect("Failed to create PetriNet");
+        let petri_net =
+            PetriNet::from_json_str(DINING_PHILOSOPHERS).expect("Failed to create PetriNet");
         assert_eq!(petri_net.places.len(), 15);
         assert_eq!(petri_net.transitions.len(), 10);
         assert_eq!(petri_net.arcs.len(), 40);
@@ -445,15 +447,19 @@ mod tests {
 
     #[test]
     fn test_exporting_json() {
-        let petri_net = PetriNet::from_json_str(DINING_PHILOSOPHERS).expect("Failed to create PetriNet");
-        let json = petri_net.to_json_str().expect("Failed to convert PetriNet to JSON");
+        let petri_net =
+            PetriNet::from_json_str(DINING_PHILOSOPHERS).expect("Failed to create PetriNet");
+        let json = petri_net
+            .to_json_str()
+            .expect("Failed to convert PetriNet to JSON");
         let net = PetriNet::from_json_str(&json).expect("Failed to create PetriNet from JSON");
         assert_eq!(net.places.len(), 15);
     }
 
     #[test]
     fn test_zblob() {
-        let petri_net = PetriNet::from_json_str(DINING_PHILOSOPHERS).expect("Failed to create PetriNet");
+        let petri_net =
+            PetriNet::from_json_str(DINING_PHILOSOPHERS).expect("Failed to create PetriNet");
         let zblob = petri_net.to_zblob();
         let net = zblob.to_net();
         assert_eq!(net.places.len(), 15);
@@ -479,7 +485,8 @@ mod tests {
         let zblob = net.to_zblob();
         println!("https://pflow.dev/?z={}", zblob.base64_zipped);
         let json_out = net.to_json().expect("Failed to convert to JSON");
-        let pretty_json = serde_json::to_string_pretty(&json_out).expect("failed to convert to pretty json");
+        let pretty_json =
+            serde_json::to_string_pretty(&json_out).expect("failed to convert to pretty json");
         print!("{pretty_json}");
     }
 

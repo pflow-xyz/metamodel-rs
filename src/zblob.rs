@@ -31,7 +31,9 @@ impl Default for Zblob {
     fn default() -> Self {
         Self {
             id: 0,
-            ipfs_cid: Oid::new(EMPTY_NET.as_bytes()).expect("oid fault").to_string(),
+            ipfs_cid: Oid::new(EMPTY_NET.as_bytes())
+                .expect("oid fault")
+                .to_string(),
             base64_zipped: EMPTY_NET.to_string(),
             title: "default".to_string(),
             description: String::new(),

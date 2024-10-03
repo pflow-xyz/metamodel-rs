@@ -39,9 +39,8 @@
     trivial_numeric_casts,
     unsafe_code,
     unused_extern_crates,
-    unused_import_braces,
+    unused_import_braces
 )]
-
 // Clippy lints
 // <https://rust-lang.github.io/rust-clippy/current/>
 #![warn(
@@ -54,9 +53,8 @@
     clippy::nursery,
     clippy::pedantic,
     clippy::todo,
-    clippy::unwrap_used,
+    clippy::unwrap_used
 )]
-
 // Allow some clippy lints
 #![allow(
     clippy::cargo_common_metadata,
@@ -72,7 +70,7 @@
     clippy::use_self,
     clippy::multiple_crate_versions,
     clippy::struct_field_names,
-    clippy::similar_names,
+    clippy::similar_names
 )]
 
 /// The `petri_net` module contains the definition and implementation of the `PetriNet` struct.
@@ -96,10 +94,12 @@ pub mod zblob;
 /// The `model` encapsulates the `PetriNet` and `Vasm` objects into a single `Model` object.
 pub mod model;
 
+/// The `display` module contains the `ImageBuilder` and `ImageOutput` traits for rendering Petri-nets as SVG.
 mod display;
 
 pub use crate::model::*;
 pub use crate::vasm::*;
+use std::sync::{Arc, Mutex};
 
 #[allow(unused)]
 #[macro_export]
@@ -155,11 +155,7 @@ macro_rules! pflow_json {
         ).expect("json fault");
 
         let sm = vasm::StateMachine::from_model(&mut net);
-        model::Model {
-            net,
-            declaration: Vec::new(),
-            vm: Box::new(sm),
-        }
+        model::Model { net, vm: Box::new(sm) }
     }};
 }
 
@@ -277,17 +273,43 @@ pub trait State {
     fn evaluate_resource(&self, label: &str) -> Result<i32, StateMachineError>;
 }
 
+/// Execute a state machine by running all available actions
 pub trait Process<TContext> {
     /// Run the state machine until no actions are available
     fn run(&self, input: TContext) -> Vec<Event<TContext>>;
     /// Runs the main loop of the state machine
-    fn run_impl(&self, action: Option<&str>, seq: Option<u64>, event_log: Vec<Event<TContext>>) -> Vec<Event<TContext>>;
+    fn run_impl(
+        &self,
+        action: Option<&str>,
+        seq: Option<u64>,
+        event_log: Vec<Event<TContext>>,
+    ) -> Vec<Event<TContext>>;
     /// Process an action and return the resulting event
-    fn process_action(&self, action: &str, seq: u64) -> Option<Event<TContext>>;
+    fn process_action(&self, action: &str, seq: u64, ctx: TContext) -> Option<Event<TContext>>;
     /// Get the next action to be executed
     fn next_action(&self) -> Vec<String>;
     /// Execute an action and return the resulting event
     fn execute_action(&self, event: Event<TContext>) -> Result<Event<TContext>, StateMachineError>;
+}
+
+/// A transaction is a single unit of work that is executed by a processor
+#[derive(Debug)]
+pub struct Transaction<TPayload> {
+    pub model: Model,
+    pub state: Arc<Mutex<Vector>>,
+    pub params: TPayload,
+}
+
+/// A processor is a stateful object that can execute transactions
+pub trait SubProcess<'a, TPayload> {
+    /// Create a new processor
+    fn new(payload: TPayload) -> Self;
+    /// Declare a model
+    fn model(payload: TPayload) -> Model;
+    /// Execute the transaction
+    fn execute(&self) -> Result<Vec<Event<Tx>>, String>;
+    /// Execute an event sub-transaction
+    fn event(&self, action: &str) -> Result<Event<Tx>, String>;
 }
 
 #[cfg(test)]
@@ -336,13 +358,13 @@ mod tests {
     });
 
     state_machine!( SimpleStateMachine {
-       Crash --> [*];
-       Moving --> Crash;
-       Moving --> Still;
-       Still --> Moving;
-       Still --> [*];
-       [*] --> Still;
-   });
+        Crash --> [*];
+        Moving --> Crash;
+        Moving --> Still;
+        Still --> Moving;
+        Still --> [*];
+        [*] --> Still;
+    });
 
     petri_net!( CoffeeMachineUsingPetriNet {{
         "modelType": "petriNet",
@@ -383,7 +405,8 @@ mod tests {
                 if let Some(initial) = place.initial {
                     if initial != 0 {
                         let measurement = self.evaluate_resource(label)?;
-                        let offset = usize::try_from(place.offset).expect("offset conversion failed");
+                        let offset =
+                            usize::try_from(place.offset).expect("offset conversion failed");
                         state[offset] = measurement;
                     }
                 }
@@ -401,7 +424,7 @@ mod tests {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct Context {
         #[allow(unused)]
         pub msg: String,
@@ -433,7 +456,8 @@ mod tests {
             let mut current_seq = seq.unwrap_or(0) + 1;
 
             while let Some(ref action) = current_action {
-                if let Some(transaction) = self.process_action(action, current_seq) {
+                let context = event_log.last().expect("last event").data.clone();
+                if let Some(transaction) = self.process_action(action, current_seq, context) {
                     event_log.push(transaction);
                 } else {
                     break;
@@ -446,7 +470,9 @@ mod tests {
                 action: "__end__".to_string(),
                 seq: current_seq + 1,
                 state: self.state.lock().expect("lock failed").clone(),
-                data: Context { msg: "Coffee machine stopped".to_string() },
+                data: Context {
+                    msg: "Coffee machine stopped".to_string(),
+                },
             };
             event_log.push(evt);
             event_log
@@ -458,9 +484,11 @@ mod tests {
         /// # Panics
         ///
         /// Panics if the lock fails
-        fn process_action(&self, action: &str, seq: u64) -> Option<Event<Context>> {
+        fn process_action(&self, action: &str, seq: u64, ctx: Context) -> Option<Event<Context>> {
             let mut state = self.state.lock().expect("lock failed");
             let res = self.model.vm.transform(&state, action, 1);
+            let mut data = ctx.clone();
+            data.msg = format!("completed! #{seq}: {action}");
 
             if res.is_ok() {
                 *state = res.output;
@@ -468,7 +496,7 @@ mod tests {
                     action: action.to_string(),
                     seq,
                     state: state.clone(),
-                    data: Context { msg: format!("completed! #{seq}: {action}") },
+                    data,
                 };
                 let transaction = self.execute_action(evt);
 
@@ -478,7 +506,9 @@ mod tests {
                             action: format!("__error__::{action}::{e:?}"),
                             seq,
                             state: state.clone(),
-                            data: Context { msg: "Action failed".to_string() },
+                            data: Context {
+                                msg: "Action failed".to_string(),
+                            },
                         };
                         Some(evt)
                     }
@@ -499,7 +529,10 @@ mod tests {
             vec![]
         }
 
-        fn execute_action(&self, event: Event<Context>) -> Result<Event<Context>, StateMachineError> {
+        fn execute_action(
+            &self,
+            event: Event<Context>,
+        ) -> Result<Event<Context>, StateMachineError> {
             println!("{} - Executing action: {}", event.seq, event.action);
             match event.action.as_str() {
                 "boil_water" | "brew_coffee" | "grind_beans" | "pour_coffee" => Ok(event),
@@ -511,8 +544,13 @@ mod tests {
     #[test]
     fn test_coffee_machine() {
         let cm = CoffeeMachineUsingPetriNet::new();
-        println!("https://pflow.dev/?z={}", cm.model.net.to_zblob().base64_zipped);
-        for event in cm.run(Context { msg: "Start".to_string() }) {
+        println!(
+            "https://pflow.dev/?z={}",
+            cm.model.net.to_zblob().base64_zipped
+        );
+        for event in cm.run(Context {
+            msg: "Start".to_string(),
+        }) {
             println!("{event:?}");
         }
     }
@@ -520,18 +558,27 @@ mod tests {
     #[test]
     fn test_coffee_machine_using_dsl() {
         let cm = CoffeeMachineUsingDsl::new();
-        println!("https://pflow.dev/?z={}", cm.model.net.to_zblob().base64_zipped);
+        println!(
+            "https://pflow.dev/?z={}",
+            cm.model.net.to_zblob().base64_zipped
+        );
     }
 
     #[test]
     fn test_coffee_machine_using_diagram() {
         let cm = CoffeeMachineUsingDiagram::new();
-        println!("https://pflow.dev/?z={}", cm.model.net.to_zblob().base64_zipped);
+        println!(
+            "https://pflow.dev/?z={}",
+            cm.model.net.to_zblob().base64_zipped
+        );
     }
 
     #[test]
     fn test_simple_state_machine() {
         let sm = SimpleStateMachine::new();
-        println!("https://pflow.dev/?z={}", sm.model.net.to_zblob().base64_zipped);
+        println!(
+            "https://pflow.dev/?z={}",
+            sm.model.net.to_zblob().base64_zipped
+        );
     }
 }

@@ -59,7 +59,6 @@ pub struct Transition {
     offset: i32,
 }
 
-
 /// TransitionMap is a type alias for a HashMap that maps a string to a `Transition`.
 pub type TransitionMap = HashMap<String, Transition>;
 
@@ -134,7 +133,10 @@ impl StateMachine {
         model.populate_arc_attributes();
         let mut roles = RoleMap::new();
         model.transitions.iter().for_each(|(_, v)| {
-            roles.insert(v.role.clone().unwrap_or_else(|| "default".to_string()), true);
+            roles.insert(
+                v.role.clone().unwrap_or_else(|| "default".to_string()),
+                true,
+            );
         });
 
         let vector_size = model.places.len();
@@ -173,7 +175,7 @@ impl StateMachine {
             } else {
                 panic!("unexpected arc type");
             }
-                .expect("place not found");
+            .expect("place not found");
 
             let t = if read || produce {
                 transitions.get_mut(&source)
@@ -182,7 +184,7 @@ impl StateMachine {
             } else {
                 panic!("unexpected arc type");
             }
-                .expect("transition not found");
+            .expect("transition not found");
 
             let delta = &mut vec![0; vector_size];
             let offset_result: usize = p.offset.try_into().expect("invalid offset");
@@ -230,7 +232,10 @@ impl StateMachine {
         });
         let mut sorted_transitions: Vec<_> = transitions.iter().collect();
         sorted_transitions.sort_by_key(|(_, v)| v.offset);
-        let actions = sorted_transitions.into_iter().map(|(k, _)| k.clone()).collect();
+        let actions = sorted_transitions
+            .into_iter()
+            .map(|(k, _)| k.clone())
+            .collect();
 
         Self {
             model_type: model_type_from_string(&model.model_type),
@@ -257,18 +262,13 @@ impl StateMachine {
         }
         false
     }
-    pub fn petri_net_fire(
-        &self,
-        state: &Vector,
-        transition: &Transition,
-        multiple: i32,
-    ) -> Transaction {
+    pub fn petri_net_fire(&self, state: &Vector, transition: &Transition, multiple: i32) -> Tx {
         let role = transition.role.clone();
         let (output, ok, overflow, underflow) =
             vector_add(&self.capacity, state, &transition.delta, multiple);
         let inhibited = self.guard_fails(state, transition, multiple);
 
-        Transaction {
+        Tx {
             output,
             ok: ok && !inhibited,
             role,
@@ -278,19 +278,14 @@ impl StateMachine {
         }
     }
 
-    pub fn elementary_fire(
-        &self,
-        state: &Vector,
-        transition: &Transition,
-        multiple: i32,
-    ) -> Transaction {
+    pub fn elementary_fire(&self, state: &Vector, transition: &Transition, multiple: i32) -> Tx {
         let role = transition.role.clone();
         let (output, ok, overflow, underflow) =
             vector_add(&self.capacity, state, &transition.delta, multiple);
         let inhibited = self.guard_fails(state, transition, multiple);
         let output_state_count = output.iter().filter(|&x| *x > 0).count();
         let elementary_ok = ok && output_state_count == 1 && !inhibited;
-        Transaction {
+        Tx {
             output,
             ok: elementary_ok,
             role,
@@ -300,12 +295,7 @@ impl StateMachine {
         }
     }
 
-    pub fn workflow_fire(
-        &self,
-        state: &Vector,
-        transition: &Transition,
-        multiple: i32,
-    ) -> Transaction {
+    pub fn workflow_fire(&self, state: &Vector, transition: &Transition, multiple: i32) -> Tx {
         let role = transition.role.clone();
         let (output, _, mut overflow, underflow) =
             vector_add(&self.capacity, state, &transition.delta, multiple);
@@ -318,16 +308,16 @@ impl StateMachine {
                     2 => {
                         overflow = true;
                         1
-                    },      // allow transition
-                    1 => 1, // no other values allowed
-                    _ => -1, // no other values allowed
+                    } // allow transition
+                    1 => 1,      // no other values allowed
+                    _ => -1,     // no other values allowed
                 }
             })
             .collect::<Vec<i32>>();
         let output_state_count = workflow_output.iter().filter(|&x| *x > 0).count();
         let ok = !overflow && output_state_count == 1 && !inhibited;
         if transition.allow_reentry && !ok && overflow {
-            Transaction {
+            Tx {
                 output: workflow_output,
                 ok: true,
                 role,
@@ -336,7 +326,7 @@ impl StateMachine {
                 underflow,
             }
         } else {
-            Transaction {
+            Tx {
                 output: workflow_output,
                 ok,
                 role,
@@ -348,10 +338,10 @@ impl StateMachine {
     }
 }
 
-/// `Transaction` is a struct that represents the result of a transformation in a state machine.
+/// `Tx` is a struct that represents the result of a transformation in a state machine.
 /// It provides information about the success of the transformation, the resulting state, the role that performed the transformation, and any errors that occurred.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Transaction {
+pub struct Tx {
     /// A boolean indicating whether the transformation was successful.
     pub ok: bool,
     /// The resulting state after the transformation.
@@ -366,7 +356,7 @@ pub struct Transaction {
     pub underflow: bool,
 }
 
-impl Transaction {
+impl Tx {
     /// Checks if the transaction was successful.
     ///
     /// # Returns
@@ -412,7 +402,7 @@ pub trait Vasm {
     ///
     /// * A `Transaction` object that represents the result of the transformation.
     ///
-    fn transform(&self, state: &Vector, action: &str, multiple: i32) -> Transaction;
+    fn transform(&self, state: &Vector, action: &str, multiple: i32) -> Tx;
 }
 
 impl dyn Vasm {
@@ -431,7 +421,7 @@ impl Vasm for StateMachine {
     }
 
     // REVIEW: test that this works properly
-    fn transform(&self, state: &Vector, action: &str, multiple: i32) -> Transaction {
+    fn transform(&self, state: &Vector, action: &str, multiple: i32) -> Tx {
         let transition = self
             .transitions
             .get(action)
@@ -476,10 +466,22 @@ mod tests {
             m.model_type("workflow");
         });
         let vm = &mm.as_vasm();
-        assert!(vm.places.contains(&"Crash".to_string()), "Crash place not found");
-        assert!(vm.places.contains(&"Moving".to_string()), "Moving place not found");
-        assert!(vm.places.contains(&"Still".to_string()), "Still place not found");
-        assert!(vm.places.contains(&"[*]".to_string()), "[*] place not found");
+        assert!(
+            vm.places.contains(&"Crash".to_string()),
+            "Crash place not found"
+        );
+        assert!(
+            vm.places.contains(&"Moving".to_string()),
+            "Moving place not found"
+        );
+        assert!(
+            vm.places.contains(&"Still".to_string()),
+            "Still place not found"
+        );
+        assert!(
+            vm.places.contains(&"[*]".to_string()),
+            "[*] place not found"
+        );
         let zblob = net.to_zblob();
         println!("https://pflow.dev/?z={}", zblob.base64_zipped);
     }
